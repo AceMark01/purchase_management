@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ─── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ─── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,.5); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.8); }
+
+/* ─── Focus ────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid #1976d2; outline-offset: 2px; }
+
+/* ─── Tables ───────────────────────────────────────────── */
+.MuiTableContainer-root::-webkit-scrollbar { height: 6px; }
+.MuiTableContainer-root::-webkit-scrollbar-thumb { background: rgba(148,163,184,.4); border-radius: 4px; }
+
+/* ─── Toastify tweaks ──────────────────────────────────── */
+.Toastify__toast { font-family: 'Inter', sans-serif; font-size: 14px; border-radius: 10px !important; }
+.Toastify__toast-body { align-items: center; }
+
+/* ─── Transitions ──────────────────────────────────────── */
+.sidebar-enter { transform: translateX(-100%); }
+.sidebar-enter-active { transform: translateX(0); transition: transform 200ms ease; }
+
+/* ─── Utility ──────────────────────────────────────────── */
+.text-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
