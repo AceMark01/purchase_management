@@ -163,6 +163,8 @@ export function DataProvider({ children }) {
   const [settingsState, setSettingsState] = useState([]);
   const [rawReceiving, setRawReceiving] = useState([]);
   const [rawLogistics, setRawLogistics] = useState([]);
+  const [rawReceiving2D, setRawReceiving2D] = useState([]);
+  const [rawLogistics2D, setRawLogistics2D] = useState([]);
   const [rawIndents, setRawIndents] = useState([]);
   const [rawApprovals, setRawApprovals] = useState([]);
   const [rawFollowUps, setRawFollowUps] = useState([]);
@@ -211,8 +213,8 @@ export function DataProvider({ children }) {
       const indentsRaw = fetchedData.indents !== undefined ? fetchedData.indents : rawIndents;
       const approvalsRaw = fetchedData.approvals !== undefined ? fetchedData.approvals : rawApprovals;
       const followUpsRaw = fetchedData.followUps !== undefined ? fetchedData.followUps : rawFollowUps;
-      const logisticsRaw = fetchedData.logistics !== undefined ? fetchedData.logistics : rawLogistics;
-      const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving;
+      const logisticsRaw = fetchedData.logistics !== undefined ? fetchedData.logistics : rawLogistics2D;
+      const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving2D;
       const masterDataRaw = fetchedData.masterData !== undefined ? fetchedData.masterData : rawMasterData;
       const usersRaw = fetchedData.users !== undefined ? fetchedData.users : rawUsers;
       const whatsappRaw = fetchedData.whatsapp !== undefined ? fetchedData.whatsapp : rawWhatsapp;
@@ -224,8 +226,8 @@ export function DataProvider({ children }) {
       if (fetchedData.indents !== undefined || !sheetsToFetch) setRawIndents(indentsRaw);
       if (fetchedData.approvals !== undefined || !sheetsToFetch) setRawApprovals(approvalsRaw);
       if (fetchedData.followUps !== undefined || !sheetsToFetch) setRawFollowUps(followUpsRaw);
-      if (fetchedData.logistics !== undefined || !sheetsToFetch) setRawLogistics(logisticsRaw);
-      if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving(receivingRaw);
+      if (fetchedData.logistics !== undefined || !sheetsToFetch) setRawLogistics2D(logisticsRaw);
+      if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving2D(receivingRaw);
       if (fetchedData.masterData !== undefined || !sheetsToFetch) setRawMasterData(masterDataRaw);
       if (fetchedData.users !== undefined || !sheetsToFetch) setRawUsers(usersRaw);
       if (fetchedData.whatsapp !== undefined || !sheetsToFetch) setRawWhatsapp(whatsappRaw);
