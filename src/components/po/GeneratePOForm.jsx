@@ -40,11 +40,12 @@ const TransparentInput = ({ readOnly, ...props }) => (
 );
 
 export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowIds = [] }) {
-   const dispatch   = useDispatch();
+  const dispatch   = useDispatch();
+  const [submitting, setSubmitting] = useState(false);
   const vendors    = useSelector((state) => state.vendorMaster.items) || [];
   const companies  = useSelector((state) => state.companies.items)    || [];
   const allRecords = useSelector((state) => state.workflow.records)   || [];
-  const { refresh, updateRow, poHistoryRecords = [] } = useData();
+  const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [] } = useData();
 
   const { control, register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
@@ -75,8 +76,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   // Auto-select supplier if selectedRowIds are passed from parent
   useEffect(() => {
     if (isViewMode) return;
-    if (selectedRowIds && selectedRowIds.length > 0 && vendors.length > 0 && poHistoryRecords.length > 0) {
-      const firstRec = poHistoryRecords.find(r => r.id === selectedRowIds[0]);
+    if (selectedRowIds && selectedRowIds.length > 0 && vendors.length > 0 && pendingPoRecords.length > 0) {
+      const firstRec = pendingPoRecords.find(r => r.id === selectedRowIds[0]);
       if (firstRec) {
         const ven = vendors.find(v => v.vendorName === firstRec.partyName);
         if (ven) {
@@ -84,19 +85,17 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         }
       }
     }
-  }, [selectedRowIds, vendors, poHistoryRecords, isViewMode, setValue]);
+  }, [selectedRowIds, vendors, pendingPoRecords, isViewMode, setValue]);
 
   const { replace } = useFieldArray({ control, name: 'items' });
 
   // Only show vendors that have at least one pending purchaseOrder indent
   const pendingPartyNames = useMemo(() => {
     const names = new Set(
-      poHistoryRecords
-        .filter(r => !r.actual)
-        .map(r => r.partyName)
+      pendingPoRecords.map(r => r.partyName)
     );
     return names;
-  }, [poHistoryRecords]);
+  }, [pendingPoRecords]);
 
   const availableVendors = useMemo(
     () => vendors.filter(v => pendingPartyNames.has(v.vendorName)),
@@ -196,9 +195,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     setValue('vendorAddress', ven.vendorLocation || 'Not available');
 
     // Batch pending indents for this supplier (filter by selectedRowIds if provided)
-    const matchedIndents = poHistoryRecords.filter(
+    const matchedIndents = pendingPoRecords.filter(
       r => r.partyName === ven.vendorName &&
-           !r.actual &&
            (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
@@ -234,7 +232,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       discount:     ind.discount     || 0,
       gst:          ind.gst          || 0,
     })));
-  }, [selectedSupplierId, vendors, poHistoryRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
+  }, [selectedSupplierId, vendors, pendingPoRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
 
   // ── Running totals ────────────────────────────────────────────────────
   const watchItems = useWatch({ control, name: 'items' });
@@ -260,14 +258,14 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
   // ── Save & Submit ─────────────────────────────────────────────────────
   const onSubmit = async () => {
-    if (isViewMode) return;
+    if (isViewMode || submitting) return;
+    setSubmitting(true);
 
     const data = watch();
     if (!data.supplierId) { toast.error('Please select a supplier first.'); return; }
 
-    const matchedIndents = poHistoryRecords.filter(
+    const matchedIndents = pendingPoRecords.filter(
       r => r.partyName === data.vendorName &&
-           !r.actual &&
            (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
@@ -312,7 +310,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const fileUrl = uploadResponse.fileUrl;
 
-      // Loop sequentially to update both sheets
+      // 1. Submit the new PO records to PO-History (Columns A-R)
+      const historyRows = [];
       for (const indent of matchedIndents) {
         const matchedFormItem = data.items?.find(
           it => it.indentNumber === indent.indentNumber && 
@@ -327,40 +326,39 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         const discounted = baseAmount - poDiscount;
         const total = discounted * (1 + poGst / 100);
 
-        // 1. Update the row in PO-History sheet
-        await updateRow('poHistory', indent._row, {
-          "Actual": new Date().toISOString().slice(0, 10),
-          "Po Number": data.poNumber,
-          "Rate": poRate,
-          "Discount%": poDiscount,
-          "Gst %": poGst,
-          "Amount": discounted,
-          "Total Amount": total,
-          "PO Copy": fileUrl
-        });
-
-        // 2. Also update the corresponding indent row in INDENT-PO sheet for downstream workflow
-        const matchingIndent = allRecords.find(
-          r => r.indentNumber === indent.indentNumber && 
-               r.serialNo === indent.serialNo
-        );
-        if (matchingIndent) {
-          await updateRow('indents', matchingIndent.id, {
-            "Po No.": data.poNumber,
-            "PO Qty": poQty,
-            "Rate 1 ": poRate,
-            "Rate 1": poRate,
-            "PO Copy": fileUrl
-          });
-        }
+        historyRows.push([
+          formatTimestamp(new Date()), // Timestamp (A)
+          formatTimestamp(new Date()), // Actual (B)
+          data.vendorName || "",       // Party Name (C)
+          data.poNumber || "",         // Po Number (D)
+          indent.itemCode || "",       // Product Code (E)
+          indent.itemName || "",       // Product (F)
+          indent.description || "",    // Description (G)
+          poQty,                       // Quntity (H)
+          indent.unit || "",           // Unit (I)
+          poRate,                      // Rate (J)
+          poDiscount,                  // Discount% (K)
+          poGst,                       // Gst % (L)
+          discounted,                  // Amount (M)
+          total,                       // Total Amount (N)
+          fileUrl,                     // PO Copy (O)
+          indent.indentNumber || "",   // Indent No. (P)
+          indent.serialNo,             // Product No. (Q)
+          data.companyName || ""       // Company Name (R)
+        ]);
       }
+
+      await gasApi.batchInsert("PO-History", historyRows);
 
       toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
       onClose();
-      await refresh();
+      // Start background refresh without global spinner
+      refresh(['indents', 'poHistory'], false).catch(err => console.error("Background refresh failed:", err));
     } catch (err) {
       console.error("Failed to generate PO:", err);
       toast.error(err.message || "Failed to write PO details to spreadsheet.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -382,13 +380,20 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           {isViewMode ? `View PO: ${viewRecord?.poNumber}` : 'Generate Purchase Order'}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()}>Print</Button>
+          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={submitting}>Print</Button>
           {!isViewMode && (
-            <Button variant="contained" size="small" color="primary" startIcon={<SaveIcon />} onClick={handleSubmit(onSubmit)}>
-              Save &amp; Submit PO
+            <Button 
+              variant="contained" 
+              size="small" 
+              color="primary" 
+              startIcon={<SaveIcon />} 
+              onClick={handleSubmit(onSubmit)}
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting PO...' : 'Save & Submit PO'}
             </Button>
           )}
-          <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
+          <IconButton size="small" onClick={onClose} disabled={submitting}><CloseIcon /></IconButton>
         </Stack>
       </Box>
 

@@ -326,42 +326,8 @@ export default function IndentManagementPage() {
       if (result.success) {
         const indentNumber = result.indentNumber || "";
 
-        // Construct initial rows for PO-History sheet (columns A-R)
-        const historyRows = activeItems.map((item, idx) => {
-          const qty = Number(item.quantity) || 0;
-          const rate = Number(item.rate) || 0;
-          const discount = Number(item.discount) || 0;
-          const gst = Number(item.gst) || 0;
-          const discounted = (qty * rate) - discount;
-          const total = discounted * (1 + gst / 100);
-
-          return [
-            timestamp,               // Timestamp (A)
-            "",                      // Actual (B)
-            data.partyName || "",    // Party Name (C)
-            "",                      // Po Number (D)
-            item.itemCode || "",     // Product Code (E)
-            item.itemName || "",     // Product (F)
-            item.groupName || "",    // Description (G)
-            qty,                     // Quntity (H)
-            item.unit || "",         // Unit (I)
-            rate,                    // Rate (J)
-            discount,                // Discount% (K)
-            gst,                     // Gst % (L)
-            discounted,              // Amount (M)
-            total,                   // Total Amount (N)
-            "",                      // PO Copy (O)
-            indentNumber,            // Indent No. (P)
-            idx + 1,                 // Product No. (Q)
-            data.companyName || ""   // Company Name (R)
-          ];
-        });
-
-        // Batch insert initial pending rows into PO-History
-        await gasApi.batchInsert("PO-History", historyRows);
-
         toast.success(`Indent ${indentNumber} submitted with ${activeItems.length} item(s)!`);
-        await refresh(['indents', 'poHistory']);
+        await refresh(['indents']);
         reset({ companyName: data.companyName, orderBy: '', partyName: '', filterGroup: '', searchItem: '', items: [] });
         setImageFile(null);
         if (imageRef.current) imageRef.current.value = '';

@@ -63,7 +63,7 @@ const getHistoryColumns = (onViewPDF) => [
 ];
 
 export default function PurchaseOrderPage() {
-  const { poHistoryRecords: records = [] } = useData();
+  const { pendingPoRecords = [], poHistoryRecords = [] } = useData();
   const [tabValue, setTabValue] = useState(0); // 0: Pending, 1: History
   const [generatePOOpen, setGeneratePOOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -74,11 +74,11 @@ export default function PurchaseOrderPage() {
 
   const stageRecords = useMemo(() => {
     if (tabValue === 0) {
-      return records.filter((r) => !r.actual);
+      return pendingPoRecords;
     } else {
-      return records.filter((r) => !!r.actual);
+      return poHistoryRecords;
     }
-  }, [records, tabValue]);
+  }, [pendingPoRecords, poHistoryRecords, tabValue]);
 
   const filtered = useMemo(
     () =>
@@ -103,7 +103,7 @@ export default function PurchaseOrderPage() {
       return;
     }
 
-    const selectedRecs = records.filter(r => selectedRowIds.includes(r.id));
+    const selectedRecs = pendingPoRecords.filter(r => selectedRowIds.includes(r.id));
     const uniqueParties = Array.from(new Set(selectedRecs.map(r => r.partyName)));
     if (uniqueParties.length > 1) {
       toast.error('Please select indents belonging to the same Party/Supplier.');

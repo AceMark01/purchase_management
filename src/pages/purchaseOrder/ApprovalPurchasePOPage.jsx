@@ -98,32 +98,39 @@ const getHistoryCols = (onViewPO) => [
 
   const onSubmit = async (data) => {
     if (!selectedRow) return;
-    try {
-      const ids = selectedRow._groupIds || [selectedRow.id];
-      const actionDate = formatTimestamp();
-      const poDate = selectedRow.poDate || "";
+    const ids = selectedRow._groupIds || [selectedRow.id];
+    const actionDate = formatTimestamp();
+    const poNumber = selectedRow.poNumber;
+    const status = data.status;
 
-      for (const id of ids) {
-        await updateRow('indents', id, {
-          "Planned4": poDate,
-          "Actual4": actionDate,
-          "Approval Status": data.status,
-          "Approval Remarks": data.remarks
-        });
-      }
+    // Instantly close dialog
+    setConfirmOpen(false);
+    setSelectedRow(null);
 
-      if (data.status === 'Approved') {
-        toast.success(`PO ${selectedRow.poNumber} Approved!`);
-      } else {
-        toast.error(`PO ${selectedRow.poNumber} Rejected.`);
+    toast.info(`Submitting decision for PO ${poNumber}...`);
+
+    // Run update sequence in background
+    (async () => {
+      try {
+        for (const id of ids) {
+          await updateRow('indents', id, {
+            "Actual4": actionDate,
+            "Approval Status": status,
+            "Remarks": data.remarks
+          }, false);
+        }
+
+        if (status === 'Approved') {
+          toast.success(`PO ${poNumber} Approved!`);
+        } else {
+          toast.error(`PO ${poNumber} Rejected.`);
+        }
+        await refresh(['indents'], false);
+      } catch (err) {
+        console.error("Failed to approve PO in background:", err);
+        toast.error(`Failed to submit approval for PO ${poNumber}: ${err.message}`);
       }
-      await refresh();
-      setConfirmOpen(false);
-      setSelectedRow(null);
-    } catch (err) {
-      console.error("Failed to approve PO:", err);
-      toast.error(err.message || "Failed to submit PO approval to database.");
-    }
+    })();
   };
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };

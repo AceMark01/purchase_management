@@ -302,35 +302,49 @@ export function mapWorkflowRecords(
     // PO Generate Stage
     if (poNo) {
       baseRecord.workflowStage.purchaseOrder = 'Completed';
-      baseRecord.workflowStage.approvalPO = 'Pending';
       baseRecord.poQty = parseNum(row["PO Qty"]);
       baseRecord.poRate = parseNum(row["Rate 1"] || row["Rate 1 "]);
       baseRecord.poCopy = poHistoryMap[poNoLower] || row["PO Copy"] || null;
     }
 
     // PO Approval Stage
-    const approvalStatus = row["Approval Status"];
+    const planned4 = row["Planned4"] || row["Planned4 "] || "";
     const actual4 = row["Actual4"] || row["Actual4 "] || "";
-    if (actual4) {
-      baseRecord.workflowStage.approvalPO = 'Completed';
-      baseRecord.approvalStatus = approvalStatus || "";
-      baseRecord.actual4 = actual4;
-      baseRecord.planned4 = row["Planned4"] || row["Planned4 "] || "";
-      baseRecord.status = approvalStatus === 'Approved' ? 'In Progress' : (approvalStatus === 'Rejected' ? 'Rejected' : baseRecord.status);
+    const approvalStatus = row["Approval Status"];
 
-      if (approvalStatus === 'Approved') {
-        baseRecord.workflowStage.sendPO = 'Pending';
-        baseRecord.workflowStage.followUp = 'Pending';
+    if (planned4 && String(planned4).trim() !== "") {
+      if (!actual4 || String(actual4).trim() === "") {
+        baseRecord.workflowStage.approvalPO = 'Pending';
+      } else {
+        baseRecord.workflowStage.approvalPO = 'Completed';
+        baseRecord.approvalStatus = approvalStatus || "";
+        baseRecord.approvalRemarks = row["Remarks"] || row["Remarks "] || "";
+        baseRecord.actual4 = actual4;
+        baseRecord.planned4 = planned4;
+        baseRecord.status = approvalStatus === 'Approved' ? 'In Progress' : (approvalStatus === 'Rejected' ? 'Rejected' : baseRecord.status);
+
+        if (approvalStatus === 'Approved') {
+          baseRecord.workflowStage.followUp = 'Pending';
+        }
       }
     }
 
     // PO Sent Status
+    const planned4_1 = row["Planned4.1"] || row["Planned4.1 "] || "";
+    const actual4_1 = row["Actual4.1"] || row["Actual4.1 "] || "";
     const poSentStatus = row["PO Sent Status"] || row["PO Sent Status "];
-    if (poSentStatus) {
-      baseRecord.workflowStage.sendPO = 'Completed';
-      baseRecord.workflowStage.followUp = 'Pending';
-      baseRecord.poSentStatus = poSentStatus;
-      baseRecord.sentDate = formatDateString(row["Actual4.1"] || row["Actual4.1 "]);
+    const remarks4_1 = row["Remarks_2"] || "";
+
+    if (planned4_1 && String(planned4_1).trim() !== "") {
+      if (!actual4_1 || String(actual4_1).trim() === "") {
+        baseRecord.workflowStage.sendPO = 'Pending';
+      } else {
+        baseRecord.workflowStage.sendPO = 'Completed';
+        baseRecord.workflowStage.followUp = 'Pending';
+        baseRecord.poSentStatus = poSentStatus || "Sent";
+        baseRecord.sentDate = formatDateString(actual4_1);
+        baseRecord.sendPORemarks = remarks4_1;
+      }
     }
 
     // Vendor Follow-up Stage

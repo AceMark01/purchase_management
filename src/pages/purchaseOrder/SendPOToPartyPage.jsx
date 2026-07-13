@@ -75,23 +75,36 @@ export default function SendPOToPartyPage() {
 
   const onSubmit = async (data) => {
     if (!selectedRow) return;
-    try {
-      const ids = selectedRow._groupIds || [selectedRow.id];
-      for (const id of ids) {
-        await updateRow('indents', id, {
-          "Actual4.1": formatTimestamp(data.sentDate),
-          "PO Sent Status": "Sent"
-        });
-      }
+    const ids = selectedRow._groupIds || [selectedRow.id];
+    const poNumber = selectedRow.poNumber;
+    const partyName = selectedRow.partyName;
+    const sentDate = data.sentDate;
+    const message = data.message;
 
-      toast.success(`PO ${selectedRow.poNumber} sent to ${selectedRow.partyName}!`);
-      await refresh();
-      setFormOpen(false);
-      setSelectedRow(null);
-    } catch (err) {
-      console.error("Failed to send PO:", err);
-      toast.error(err.message || "Failed to save PO sent status to database.");
-    }
+    // Instantly close dialog
+    setFormOpen(false);
+    setSelectedRow(null);
+
+    toast.info(`Sending PO ${poNumber} to ${partyName}...`);
+
+    // Run update sequence in background
+    (async () => {
+      try {
+        for (const id of ids) {
+          await updateRow('indents', id, {
+            "Actual4.1": formatTimestamp(sentDate),
+            "PO Sent Status": "Sent",
+            "col-37": message
+          }, false);
+        }
+
+        toast.success(`PO ${poNumber} sent to ${partyName}!`);
+        await refresh(['indents'], false);
+      } catch (err) {
+        console.error("Failed to send PO in background:", err);
+        toast.error(`Failed to send PO ${poNumber}: ${err.message}`);
+      }
+    })();
   };
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };

@@ -94,6 +94,7 @@ export const gasApi = {
   updateCell: (sheetName, rowIndex, columnIndex, value) => post({ action: 'updateCell', sheetName, rowIndex, columnIndex, value }),
   deleteRow: (sheetName, rowIndex) => post({ action: 'delete', sheetName, rowIndex }),
   uploadFile: (data) => post({ action: 'uploadFile', ...data }),
+  updateFullRow: (sheetName, rowIndex, rowData) => post({ action: 'update', sheetName, rowIndex, rowData: JSON.stringify(rowData) }),
 
   // Dynamic multi-column row update helper
   updateRow: async (sheetName, rowIndex, headers, columnValues) => {

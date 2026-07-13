@@ -126,6 +126,17 @@ const raw2DArrayToObjects = (grid, sheetName = "") => {
   }
 
   const headers = (grid[headerRowIndex] || []).map(h => String(h || "").trim());
+  const seen = {};
+  const uniqueHeaders = headers.map(h => {
+    if (!h) return "";
+    if (seen[h] !== undefined) {
+      seen[h]++;
+      return `${h}_${seen[h]}`;
+    }
+    seen[h] = 1;
+    return h;
+  });
+
   const objects = [];
   for (let i = headerRowIndex + 1; i < grid.length; i++) {
     const row = grid[i];
@@ -134,8 +145,8 @@ const raw2DArrayToObjects = (grid, sheetName = "") => {
     }
     // _row is the physical 1-based row index in spreadsheet (i + 1)
     const obj = { _row: i + 1 };
-    for (let j = 0; j < headers.length; j++) {
-      const header = headers[j];
+    for (let j = 0; j < uniqueHeaders.length; j++) {
+      const header = uniqueHeaders[j];
       if (header) {
         obj[header] = row[j];
       }
@@ -182,6 +193,7 @@ export function DataProvider({ children }) {
   const [rawPoHistory, setRawPoHistory] = useState([]);
   const [headersState, setHeadersState] = useState({});
   const [poHistoryRecords, setPoHistoryRecords] = useState([]);
+  const [pendingPoRecords, setPendingPoRecords] = useState([]);
   const [orderByListState, setOrderByListState] = useState([]);
 
   const loadData = async (showGlobalLoading = true, sheetsToFetch = null) => {
@@ -454,6 +466,57 @@ export function DataProvider({ children }) {
         createdDate: row["Timestamp"] || "",
         orderBy: ""
       }));
+      // Map INDENT-PO records for PO page pending consumption
+      const mappedIndents = indents.map((row, idx) => {
+        const qty = parseNum(row["Quantity"] || row["Quntity"]);
+        const rate = parseNum(row["Rate"]);
+        const gst = parseNum(row["GST %"] || row["GST"] || row["Gst %"]);
+        const discount = parseNum(row["Discount Amount"] || row["Discount"] || row["Discount%"]);
+        const amount = (qty * rate * (1 + gst / 100)) - discount;
+        
+        const indentHeaders = headersMap.indents || [];
+        const plannedKey = indentHeaders[17] || "Planned1";
+        const actualKey = indentHeaders[18] || "Actual1";
+        
+        const planned1 = row["Planned1"] || row[plannedKey] || "";
+        const actual1 = row["Actual1"] || row[actualKey] || "";
+
+        return {
+          id: row._row || (idx + 1),
+          _row: row._row,
+          timestamp: row["Timestamp"] || "",
+          indentNumber: row["Indent Number"] || row["Indent No."] || row["Indent No"] || row["Request ID"] || "",
+          serialNo: parseNum(row["Serial No."] || row["Product No."] || row["Product No"]),
+          orderBy: row["Order By"] || "",
+          partyName: row["Party Name"] || "",
+          groupName: row["Group Name"] || "",
+          itemName: row["Item Name"] || row["Product"] || "",
+          itemCode: row["Item code"] || row["Item Code"] || row["Product Code"] || "",
+          description: row["Discription"] || row["Description"] || "",
+          quantity: qty,
+          unit: row["Unit"] || "",
+          rate: rate,
+          gst: gst,
+          discount: discount,
+          amount: amount,
+          leadDays: parseNum(row["Approx Lead days Item will be dileverd सामान डिलीवर होने में लगभग कितने दिन लगेंगे(लीड डेज़)"] || row["Approx Lead Days"]),
+          companyName: row["Company Name"] || "",
+          image: row["Image"] || row["PO Copy"] || null,
+          planned1: planned1,
+          actual1: actual1,
+          
+          // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
+          status: actual1 ? "Completed" : "Pending",
+          createdDate: row["Timestamp"] || "",
+        };
+      });
+
+      // Filter pending: Planned1 is not null/empty AND Actual1 is null/empty
+      const pendingPo = mappedIndents.filter(row => 
+        row.planned1 && String(row.planned1).trim() !== "" && (!row.actual1 || String(row.actual1).trim() === "")
+      );
+      
+      setPendingPoRecords(pendingPo);
       setPoHistoryRecords(mappedPoHistory);
 
       // Map WhatsApp entries
@@ -476,12 +539,12 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
-  const refresh = async (sheetsToFetch = null) => {
-    setWriteLoading(true);
+  const refresh = async (sheetsToFetch = null, showSpinner = true) => {
+    if (showSpinner) setWriteLoading(true);
     try {
       await loadData(false, sheetsToFetch);
     } finally {
-      setWriteLoading(false);
+      if (showSpinner) setWriteLoading(false);
     }
   };
 
@@ -547,7 +610,7 @@ export function DataProvider({ children }) {
     );
   }
 
-  const updateRow = async (resource, rowIndex, columnValues) => {
+  const updateRow = async (resource, rowIndex, columnValues, showSpinner = true) => {
     const sheetName = SHEET_MAP[resource];
     const headers = headersState[resource] || [];
     let colOffset = 0;
@@ -559,16 +622,24 @@ export function DataProvider({ children }) {
       colOffset = 0;
     }
     
-    setWriteLoading(true);
+    if (showSpinner) setWriteLoading(true);
     try {
       for (const [colName, value] of Object.entries(columnValues)) {
-        const colIdx = headers.indexOf(colName) + 1;
-        if (colIdx > 0) {
-          await gasApi.updateCell(sheetName, rowIndex, colIdx + colOffset, value);
+        let absoluteColIdx = -1;
+        if (colName.startsWith("col-")) {
+          absoluteColIdx = parseInt(colName.replace("col-", ""), 10);
+        } else {
+          const colIdx = headers.indexOf(colName) + 1;
+          if (colIdx > 0) {
+            absoluteColIdx = colIdx + colOffset;
+          }
+        }
+        if (absoluteColIdx > 0) {
+          await gasApi.updateCell(sheetName, rowIndex, absoluteColIdx, value);
         }
       }
     } finally {
-      setWriteLoading(false);
+      if (showSpinner) setWriteLoading(false);
     }
   };
 
@@ -647,6 +718,7 @@ export function DataProvider({ children }) {
         addRow,
         updateSettingsRow,
         poHistoryRecords,
+        pendingPoRecords,
         orderByList: orderByListState
       }}
     >
