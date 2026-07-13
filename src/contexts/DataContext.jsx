@@ -9,6 +9,7 @@ import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVe
 import { setRecords } from '../store/slices/workflowSlice';
 import { setVendors } from '../store/slices/vendorSlice';
 import { setCompanies } from '../store/slices/companySlice';
+import { setUsers } from '../store/slices/userSlice';
 import { formatTimestamp } from '../utils/formatters';
 
 const DataContext = createContext(null);
@@ -110,7 +111,7 @@ const raw2DArrayToObjects = (grid, sheetName = "") => {
   let headerRowIndex = 0;
   
   if (sheetName === "INDENT-PO") {
-    headerRowIndex = 6; // Hardcode header to row 7 (index 6) for INDENT-PO
+    headerRowIndex = 5; // Hardcode header to row 6 (index 5) for INDENT-PO
   } else {
     for (let i = 0; i < Math.min(grid.length, 10); i++) {
       const row = grid[i];
@@ -226,6 +227,17 @@ export function DataProvider({ children }) {
       const poSentStatusRaw = fetchedData.poSentStatus !== undefined ? fetchedData.poSentStatus : rawPoSentStatus;
       const poGenerateRaw = fetchedData.poGenerate !== undefined ? fetchedData.poGenerate : rawPoGenerate;
       const poHistoryRaw = fetchedData.poHistory !== undefined ? fetchedData.poHistory : rawPoHistory;
+
+      console.log("[DEBUG DataContext] Raw rows fetched:", {
+        indents: indentsRaw.length,
+        approvals: approvalsRaw.length,
+        followUps: followUpsRaw.length,
+        logistics: logisticsRaw.length,
+        receiving: receivingRaw.length,
+        masterData: masterDataRaw.length,
+        users: usersRaw.length,
+        poHistory: poHistoryRaw.length,
+      });
 
       // Update cached state variables
       if (fetchedData.indents !== undefined || !sheetsToFetch) setRawIndents(indentsRaw);
@@ -362,6 +374,14 @@ export function DataProvider({ children }) {
       const poSentStatus = raw2DArrayToObjects(poSentStatusRaw);
       const poHistory = raw2DArrayToObjects(poHistoryRaw);
 
+      console.log("[DEBUG DataContext] Parsed objects:", {
+        indents: indents.length,
+        approvals: approvals.length,
+        masterDataProducts: mappedProducts.length,
+        users: mappedUsers.length,
+        poHistory: poHistory.length,
+      });
+
       setRawReceiving(receiving);
       setRawLogistics(logistics);
 
@@ -373,6 +393,7 @@ export function DataProvider({ children }) {
       dispatch(setCompanies(mappedCompanies));
 
       setUsersState(mappedUsers);
+      dispatch(setUsers(mappedUsers));
 
       // Order By (col-K): index 10 in Master Data raw sheet
       const orderByValues = masterDataRaw.slice(2)

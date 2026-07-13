@@ -225,9 +225,13 @@ export function mapWorkflowRecords(
   });
 
   // First pass: Map raw indents (filter out empty/unassigned rows while preserving correct row index mapping)
-  const indentsRowsFiltered = indentsRows.filter(row => row["Indent Number"] && String(row["Indent Number"]).trim() !== "");
+  const indentsRowsFiltered = indentsRows.filter(row => {
+    const id = row["Indent Number"] || row["Indent No."] || row["Indent No"] || row["Request ID"];
+    return id && String(id).trim() !== "";
+  });
   const mappedRecords = indentsRowsFiltered.map((row, idx) => {
-    const indentNo = String(row["Indent Number"] || "").trim();
+    const indentNoRaw = row["Indent Number"] || row["Indent No."] || row["Indent No"] || row["Request ID"] || "";
+    const indentNo = String(indentNoRaw).trim();
     const poNo = String(row["Po No."] || row["Po No"] || "").trim();
     const poNoLower = poNo.toLowerCase();
     const indentNoNorm = normalizeIndentNumber(indentNo);

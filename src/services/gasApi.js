@@ -75,6 +75,8 @@ export const gasApi = {
       result[s.key] = res.data[s.name] || [];
     }
     
+    console.log("[DEBUG gasApi] bootstrap result size:", Object.keys(result).map(k => `${k}: ${result[k].length} rows`));
+    
     return { success: true, data: result };
   },
 
