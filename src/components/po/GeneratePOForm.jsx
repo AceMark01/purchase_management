@@ -253,7 +253,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   }, [watchItems]);
 
   const data          = watch();
-  const emptyRowsCount = Math.max(12 - (data.items?.length || 0), 4);
+  const emptyRowsCount = 1;
   const emptyRows      = Array.from({ length: emptyRowsCount });
 
   // ── Save & Submit ─────────────────────────────────────────────────────

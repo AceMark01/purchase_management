@@ -12,11 +12,19 @@ export const groupByPO = (records) => {
         _groupIds: [r.id],
         _itemCount: 1,
         _totalAmount: parseFloat(r.amount) || 0,
+        _indentNumbers: r.indentNumber ? [r.indentNumber] : [],
+        _serialNos: (r.serialNo !== undefined && r.serialNo !== null && r.serialNo !== '') ? [r.serialNo] : [],
       };
     } else {
       groups[key]._groupIds.push(r.id);
       groups[key]._itemCount += 1;
       groups[key]._totalAmount += parseFloat(r.amount) || 0;
+      if (r.indentNumber && !groups[key]._indentNumbers.includes(r.indentNumber)) {
+        groups[key]._indentNumbers.push(r.indentNumber);
+      }
+      if (r.serialNo !== undefined && r.serialNo !== null && r.serialNo !== '' && !groups[key]._serialNos.includes(r.serialNo)) {
+        groups[key]._serialNos.push(r.serialNo);
+      }
     }
   });
   return Object.values(groups);

@@ -8,6 +8,7 @@ import PhoneCallbackIcon from '@mui/icons-material/PhoneCallback';
 import { useData } from '../../contexts/DataContext';
 import { formatTimestamp } from '../../utils/formatters';
 import { toast } from 'react-toastify';
+import { gasApi } from '../../services/gasApi';
 
 const SectionLabel = ({ children }) => (
   <Typography variant="caption" fontWeight={700} color="text.secondary"
@@ -20,7 +21,7 @@ const SectionLabel = ({ children }) => (
 export default function CompleteFollowUpForm({ open, onClose, selectedRow, groupIds }) {
   const dispatch = useDispatch();
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, addRow, updateRow } = useData();
+  const { refresh, updateRow, headers } = useData();
 
   const { control, handleSubmit, watch, register, formState: { errors } } = useForm({
     defaultValues: {
@@ -40,21 +41,45 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     try {
-      // Loop sequentially to avoid concurrent Google Sheets LockService issues
-      for (const record of matchedRecords) {
-        await addRow("followUps", {
+      const headersList = headers?.followUps || [
+        "Timestamp",
+        "Indent No.",
+        "S-No.",
+        "Follow-up Status",
+        "Excepted Arrival Date",
+        "Remark",
+        "Follow Up By",
+        "Next Follow-up Date",
+        "Actual"
+      ];
+
+      const timestamp = formatTimestamp();
+
+      const rowsData = matchedRecords.map(record => {
+        const rowObj = {
+          "Timestamp": timestamp,
           "Indent No.": record.indentNumber,
+          "S-No.": record.serialNo,
           "Follow-up Status": data.followUpStatus,
-          "Excepted Arrival Date": data.expectedArrivalDate,
+          "Excepted Arrival Date": data.followUpStatus === 'Arrange Logistics' ? data.expectedArrivalDate : '',
           "Remark": data.remarks,
           "Follow Up By": data.followUpBy,
-          "Next Follow-up Date": data.nextFollowDate,
+          "Next Follow-up Date": data.followUpStatus === 'Further Follow Up' ? data.nextFollowDate : '',
           "CodeNO": "",
-          "Actual": (data.followUpStatus === 'Further Follow Up') ? "" : formatTimestamp()
-        });
+          "Actual": (data.followUpStatus === 'Further Follow Up') ? "" : timestamp
+        };
+        // Map dynamically to ensure column alignment matches sheet
+        return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
+      });
 
-        // If user cancelled, also update the indent status in the main sheet
-        if (data.followUpStatus === 'Cancel') {
+      const result = await gasApi.batchInsert("Flw-up", rowsData);
+      if (!result.success) {
+        throw new Error(result.error || "Batch insert failed");
+      }
+
+      // If user cancelled, also update the indent status in the main sheet
+      if (data.followUpStatus === 'Cancel') {
+        for (const record of matchedRecords) {
           await updateRow('indents', record.id, {
             "Order Cancel": "Cancel"
           });
@@ -127,8 +152,20 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
                       Expected Arrival Date <span style={{ color: 'red' }}>*</span>
                     </Typography>
                     <TextField fullWidth type="date"
-                      {...register('expectedArrivalDate', { required: 'Required' })}
+                      {...register('expectedArrivalDate', { required: followUpStatus === 'Arrange Logistics' ? 'Required' : false })}
+                      InputLabelProps={{ shrink: true }}
                       error={!!errors.expectedArrivalDate} helperText={errors.expectedArrivalDate?.message} />
+                  </Box>
+                )}
+                {followUpStatus === 'Further Follow Up' && (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Next Follow Up Date <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth type="date"
+                      {...register('nextFollowDate', { required: followUpStatus === 'Further Follow Up' ? 'Required' : false })}
+                      InputLabelProps={{ shrink: true }}
+                      error={!!errors.nextFollowDate} helperText={errors.nextFollowDate?.message} />
                   </Box>
                 )}
               </Box>

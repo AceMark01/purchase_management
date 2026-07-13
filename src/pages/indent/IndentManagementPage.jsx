@@ -386,11 +386,11 @@ export default function IndentManagementPage() {
           </Box>
           Create New Indent
         </DialogTitle>
-        <DialogContent sx={{ p: 3, overflowY: 'auto' }}>
-          <form id="indent-form" onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <DialogContent sx={{ p: 3, overflowY: 'auto' }}>
 
             {/* Row 1 — Company | Order By | Party | Image */}
-            <Grid container spacing={2} mb={partyName ? 3 : 2}>
+            <Grid container spacing={2.5}>
 
               {/* Company Name */}
               <Grid item xs={12} sm={6}>
@@ -478,7 +478,7 @@ export default function IndentManagementPage() {
                   borderColor: isDark ? alpha('#3b82f6', 0.2) : '#e2e8f0',
                   borderRadius: 2,
                   p: 2.5,
-                  mb: 3,
+                  mt: 3,
                 }}
               >
                 {/* Section header */}
@@ -587,49 +587,44 @@ export default function IndentManagementPage() {
                 </TableContainer>
               </Box>
             )}
+          </DialogContent>
 
-            {/* Action Buttons */}
-            <Stack direction="row" spacing={2} justifyContent="center" mt={1}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                size="large"
-                disabled={isSubmitting}
-                onClick={() => setIsFormOpen(false)}
-                sx={{
-                  px: 5, py: 1.3,
-                  textTransform: 'none',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  borderRadius: 2,
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={isSubmitting}
-                startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />}
-                sx={{
-                  px: 5, py: 1.3,
-                  bgcolor: '#059669',
-                  '&:hover': { bgcolor: '#047857' },
-                  textTransform: 'none',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  borderRadius: 2,
-                  boxShadow: '0 4px 14px rgba(5,150,105,0.35)',
-                  '&:hover': { bgcolor: '#047857', boxShadow: '0 6px 18px rgba(5,150,105,0.45)' },
-                }}
-              >
-                {isSubmitting ? 'Submitting...' : ' Submit Request'}
-              </Button>
-            </Stack>
+          <Divider />
 
-          </form>
-        </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1.5 }}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              disabled={isSubmitting}
+              onClick={() => setIsFormOpen(false)}
+              sx={{
+                px: 3.5, py: 1,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: 2,
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={isSubmitting}
+              startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />}
+              sx={{
+                px: 3.5, py: 1,
+                bgcolor: '#059669',
+                '&:hover': { bgcolor: '#047857' },
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: 2,
+                boxShadow: '0 4px 12px rgba(5,150,105,0.2)',
+              }}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
 
       {/* ── Indent List Table ── */}
