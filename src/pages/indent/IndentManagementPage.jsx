@@ -187,7 +187,7 @@ export default function IndentManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { products, vendors, companies, refresh } = useData();
+  const { products, vendors, companies, orderByList, refresh } = useData();
 
   const {
     register: reg,
@@ -451,7 +451,9 @@ export default function IndentManagementPage() {
                     error={!!errors.orderBy}
                     sx={INPUT_SX}
                   >
-                    {ORDER_BY_LIST.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+                    {(orderByList && orderByList.length > 0 ? orderByList : ORDER_BY_LIST).map(o => (
+                      <MenuItem key={o} value={o}>{o}</MenuItem>
+                    ))}
                   </TextField>
                 )} />
               </Grid>

@@ -6,7 +6,7 @@ import {
   Grid, TextField, MenuItem, Typography, Divider, Chip, Stack,
   Card, CardContent, InputAdornment, IconButton, Tooltip,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
-  TablePagination, TableSortLabel, Paper,
+  TablePagination, TableSortLabel, Paper, Skeleton,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -161,7 +161,7 @@ const TABLE_COLUMNS = [
 ];
 
 export default function VendorMasterPage() {
-  const { vendors: items = [], refresh, updateRow } = useData();
+  const { vendors: items = [], refresh, updateRow, loading } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -327,7 +327,21 @@ export default function VendorMasterPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginated.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                    <TableCell><Skeleton animation="wave" height={24} /></TableCell>
+                  </TableRow>
+                ))
+              ) : paginated.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={TABLE_COLUMNS.length + 1} align="center" sx={{ py: 4, color: 'text.disabled' }}>
                     <Stack sx={{ alignItems: 'center' }} spacing={1}>

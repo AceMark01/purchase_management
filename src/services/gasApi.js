@@ -45,6 +45,7 @@ async function post(params) {
 }
 
 export const gasApi = {
+  fetchSheet: (sheetName) => get({ sheet: sheetName }),
   // Read operations (sequential fetches for all sheets to avoid preflight/CORS issues)
   bootstrap: async () => {
     const activeSheets = [

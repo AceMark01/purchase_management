@@ -1,14 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { gasApi } from '../services/gasApi';
 
 const AuthContext = createContext(null);
-
-const USERS = [
-  { id: 1, name: 'Admin User', email: 'admin@pms.com', password: 'admin123', role: 'admin', department: 'Management', status: 'active', lastLogin: '2026-07-06' },
-  { id: 2, name: 'John Smith', email: 'user@pms.com', password: 'user123', role: 'user', department: 'Procurement', status: 'active', lastLogin: '2026-07-05' },
-  { id: 3, name: 'Sarah Johnson', email: 'sarah@pms.com', password: 'sarah123', role: 'user', department: 'Logistics', status: 'active', lastLogin: '2026-07-04' },
-  { id: 4, name: 'Mike Wilson', email: 'mike@pms.com', password: 'mike123', role: 'user', department: 'Warehouse', status: 'inactive', lastLogin: '2026-06-27' },
-  { id: 5, name: 'Emma Davis', email: 'emma@pms.com', password: 'emma123', role: 'admin', department: 'Finance', status: 'active', lastLogin: '2026-07-07' },
-];
 
 const ADMIN_PAGES = [
   'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
@@ -66,19 +59,89 @@ export function AuthProvider({ children }) {
     };
   };
 
-  const login = (email, password) => {
-    const found = USERS.find((u) => u.email === email && u.password === password);
-    if (!found) return { success: false, message: 'Invalid email or password' };
-    if (found.status === 'inactive') return { success: false, message: 'Account is inactive. Contact administrator.' };
+  const login = async (username, password) => {
+    try {
+      const res = await gasApi.fetchSheet('LOGIN');
+      if (!res || !res.success || !Array.isArray(res.data)) {
+        return { success: false, message: 'Failed to fetch credentials from Google Sheets.' };
+      }
 
+      const rows = res.data;
+      if (rows.length < 2) {
+        return { success: false, message: 'No credential records found in sheet.' };
+      }
 
-    const { password: _, ...safeUser } = found;
-    const perms = getDefaultPermissions(found.role);
-    setUser(safeUser);
-    setPermissions(perms);
-    localStorage.setItem('pms_user', JSON.stringify(safeUser));
-    localStorage.setItem('pms_permissions', JSON.stringify(perms));
-    return { success: true };
+      const headers = rows[0].map((h) => String(h || '').trim().toUpperCase());
+      const usernameIdx = headers.indexOf('USERNAME');
+      const passwordIdx = headers.indexOf('PASSWORD');
+      const fullnameIdx = headers.indexOf('FULLNAME');
+      const roleIdx = headers.indexOf('ROLE');
+      const pageAccessIdx = headers.indexOf('PAGE-ACCESS');
+
+      if (usernameIdx === -1 || passwordIdx === -1) {
+        return { success: false, message: 'Invalid LOGIN sheet structure. Missing USERNAME or PASSWORD columns.' };
+      }
+
+      let foundUser = null;
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        const u = String(row[usernameIdx] || '').trim();
+        const p = String(row[passwordIdx] || '').trim();
+
+        if (u.toLowerCase() === username.toLowerCase() && p === password) {
+          foundUser = {
+            fullname: fullnameIdx !== -1 ? String(row[fullnameIdx] || '').trim() : u,
+            username: u,
+            role: roleIdx !== -1 ? String(row[roleIdx] || '').trim().toLowerCase() : 'user',
+            pageAccess: pageAccessIdx !== -1 ? String(row[pageAccessIdx] || '').trim() : '',
+          };
+          break;
+        }
+      }
+
+      if (!foundUser) {
+        return { success: false, message: 'Invalid username or password.' };
+      }
+
+      const safeUser = {
+        name: foundUser.fullname,
+        email: foundUser.username, // keep email property for UI compatibility
+        username: foundUser.username,
+        role: foundUser.role,
+        department: foundUser.role === 'admin' ? 'Management' : 'Procurement',
+        status: 'active',
+      };
+
+      let parsedPages = foundUser.role === 'admin' ? ADMIN_PAGES : USER_PAGES;
+      if (foundUser.pageAccess) {
+        const accessVal = foundUser.pageAccess.trim();
+        if (accessVal.toLowerCase() !== 'all') {
+          parsedPages = accessVal.split(',').map((p) => p.trim());
+        }
+      }
+
+      const perms = {
+        pages: parsedPages,
+        actions: {
+          create: true,
+          read: true,
+          update: true,
+          delete: foundUser.role === 'admin',
+          export: true,
+          print: true,
+        },
+      };
+
+      setUser(safeUser);
+      setPermissions(perms);
+      localStorage.setItem('pms_user', JSON.stringify(safeUser));
+      localStorage.setItem('pms_permissions', JSON.stringify(perms));
+      return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, message: err.message || 'Error connecting to Google Sheets database.' };
+    }
   };
 
   const logout = () => {

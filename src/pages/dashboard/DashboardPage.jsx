@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Grid, Card, CardContent, CardHeader, Typography, Box, Chip,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Divider, Stack, alpha, useTheme,
+  Divider, Stack, alpha, useTheme, Skeleton,
 } from '@mui/material';
 import { useSelector } from 'react-redux';
+import { useData } from '../../contexts/DataContext';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -87,6 +88,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { loading } = useData();
 
   const records = useSelector((s) => s.workflow.records);
   const vendors = useSelector((s) => s.vendorMaster.items) || [];
@@ -144,6 +146,46 @@ export default function DashboardPage() {
 
   const pos = records.filter(r => r.workflowStage.purchaseOrder === 'Completed');
   const receives = records.filter(r => r.workflowStage.receiveMaterial === 'Completed');
+
+  if (loading) {
+    return (
+      <Box>
+        <PageHeader
+          title="Dashboard"
+          subtitle="Loading overview details..."
+          breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Dashboard' }]}
+        />
+        {/* Skeleton Stat Cards */}
+        <Grid container spacing={2.5} sx={{ mb: 3 }}>
+          {Array.from(new Array(8)).map((_, idx) => (
+            <Grid item xs={12} sm={6} md={3} key={idx}>
+              <Card sx={{ height: 110, borderRadius: 3, border: 1, borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,.03)' }}>
+                <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%', p: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Skeleton variant="text" width="60%" height={20} sx={{ mb: 1 }} />
+                    <Skeleton variant="text" width="40%" height={32} />
+                  </Box>
+                  <Skeleton variant="circular" width={48} height={48} />
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+        
+        {/* Skeleton Charts */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 2.5, mb: 2.5 }}>
+          <Card sx={{ flex: 1, p: 3, borderRadius: 3, border: 1, borderColor: 'divider' }}>
+            <Skeleton variant="text" width="40%" height={24} sx={{ mb: 2 }} />
+            <Skeleton variant="rectangular" height={280} sx={{ borderRadius: 2 }} />
+          </Card>
+          <Card sx={{ flex: 2, p: 3, borderRadius: 3, border: 1, borderColor: 'divider' }}>
+            <Skeleton variant="text" width="30%" height={24} sx={{ mb: 2 }} />
+            <Skeleton variant="rectangular" height={280} sx={{ borderRadius: 2 }} />
+          </Card>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box>

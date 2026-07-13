@@ -4,6 +4,7 @@ import { Backdrop, CircularProgress, Box, Typography, Card, Button } from '@mui/
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { gasApi } from '../services/gasApi';
+import { useAuth } from './AuthContext';
 import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVendorRow, mapUserRow, mapSettingsRow } from '../services/dataMapper';
 import { setRecords } from '../store/slices/workflowSlice';
 import { setVendors } from '../store/slices/vendorSlice';
@@ -140,7 +141,15 @@ const raw2DArrayToObjects = (grid) => {
 
 export function DataProvider({ children }) {
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !!localStorage.getItem('pms_user');
+    } catch {
+      return true;
+    }
+  });
   const [writeLoading, setWriteLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -156,6 +165,7 @@ export function DataProvider({ children }) {
   const [rawLogistics, setRawLogistics] = useState([]);
   const [headersState, setHeadersState] = useState({});
   const [poHistoryRecords, setPoHistoryRecords] = useState([]);
+  const [orderByListState, setOrderByListState] = useState([]);
 
   const loadData = async (showGlobalLoading = true) => {
     if (showGlobalLoading) setLoading(true);
@@ -274,6 +284,13 @@ export function DataProvider({ children }) {
 
       setUsersState(mappedUsers);
 
+      // Order By (col-K): index 10 in Master Data raw sheet
+      const orderByValues = masterDataRaw.slice(2)
+        .map(row => String(row[10] || "").trim())
+        .filter(val => val !== "");
+      const mappedOrderBy = [...new Set(orderByValues)];
+      setOrderByListState(mappedOrderBy);
+
       // Map workflow records (derived)
       const mappedRecords = mapWorkflowRecords(
         indents,
@@ -341,8 +358,12 @@ export function DataProvider({ children }) {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const refresh = async () => {
     setWriteLoading(true);
@@ -353,26 +374,7 @@ export function DataProvider({ children }) {
     }
   };
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 2,
-          bgcolor: 'background.default',
-        }}
-      >
-        <CircularProgress size={50} thickness={4.5} />
-        <Typography variant="body1" fontWeight={600} color="text.secondary">
-          Connecting to Google Sheets Database...
-        </Typography>
-      </Box>
-    );
-  }
+
 
   if (error) {
     return (
@@ -519,7 +521,8 @@ export function DataProvider({ children }) {
         updateRow,
         addRow,
         updateSettingsRow,
-        poHistoryRecords
+        poHistoryRecords,
+        orderByList: orderByListState
       }}
     >
       {children}

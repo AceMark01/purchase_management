@@ -13,6 +13,7 @@ import ViewColumnIcon   from '@mui/icons-material/ViewColumn';
 import TableRowsIcon    from '@mui/icons-material/TableRows';
 import { exportToExcel, exportToPDF, printTable } from '../../utils/exportUtils';
 import { statusColor } from '../../utils/formatters';
+import { useData } from '../../contexts/DataContext';
 
 /* ── empty state ─────────────────────────────────────── */
 function EmptyState() {
@@ -128,6 +129,16 @@ export default function DataTable({
 }) {
   const theme    = useTheme();
   const isDark   = theme.palette.mode === 'dark';
+  let dataLoading = false;
+  try {
+    const dataCtx = useData();
+    if (dataCtx) {
+      dataLoading = dataCtx.loading;
+    }
+  } catch (e) {
+    // Ignore error if context is not present
+  }
+  const isLoading = loading !== undefined ? loading : dataLoading;
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [order, setOrder]               = useState('desc');
@@ -276,7 +287,7 @@ export default function DataTable({
       {/* ── Mobile: Card View ── */}
       {isMobile && (
         <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.25, overflowY: 'auto', maxHeight: 620 }}>
-          {loading && Array.from({ length: 4 }).map((_, i) => (
+          {isLoading && Array.from({ length: 4 }).map((_, i) => (
             <Paper key={i} elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 2 }}>
               <Skeleton animation="wave" height={18} sx={{ mb: 1.5 }} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
@@ -284,8 +295,8 @@ export default function DataTable({
               </Box>
             </Paper>
           ))}
-          {!loading && paginated.length === 0 && <EmptyState />}
-          {!loading && paginated.map((row, idx) => (
+          {!isLoading && paginated.length === 0 && <EmptyState />}
+          {!isLoading && paginated.map((row, idx) => (
             <MobileCard
               key={row.id || idx}
               row={row} idx={idx} page={page} rowsPerPage={rowsPerPage}
@@ -340,7 +351,7 @@ export default function DataTable({
             </TableHead>
 
             <TableBody>
-              {loading && Array.from({ length: 6 }).map((_, i) => (
+              {isLoading && Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
                   {Array.from({ length: visibleColumns.length + (showCheckbox ? 1 : 0) + (!hideIndexColumn ? 1 : 0) + (actions && !hideActionsColumn ? 1 : 0) }).map((_, j) => (
                     <TableCell key={j} sx={{ py: rowPy }}><Skeleton animation="wave" height={20} sx={{ borderRadius: 1 }} /></TableCell>
@@ -348,7 +359,7 @@ export default function DataTable({
                 </TableRow>
               ))}
 
-              {!loading && paginated.length === 0 && (
+              {!isLoading && paginated.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={visibleColumns.length + (showCheckbox ? 1 : 0) + (!hideIndexColumn ? 1 : 0) + (actions && !hideActionsColumn ? 1 : 0)} sx={{ border: 0, p: 0 }}>
                     <EmptyState />
@@ -356,7 +367,7 @@ export default function DataTable({
                 </TableRow>
               )}
 
-              {!loading && paginated.map((row, idx) => {
+              {!isLoading && paginated.map((row, idx) => {
                 const isSelected = selectedRowIds.includes(row.id);
                 return (
                   <TableRow key={row.id || idx} hover sx={{

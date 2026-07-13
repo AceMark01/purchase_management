@@ -1,9 +1,14 @@
 import { Box, Typography, Button } from '@mui/material';
 import BlockIcon from '@mui/icons-material/Block';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function UnauthorizedPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  if (!user) return <Navigate to="/login" replace />;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 2 }}>
       <BlockIcon sx={{ fontSize: 80, color: 'error.light' }} />

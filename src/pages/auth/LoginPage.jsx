@@ -13,10 +13,6 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PersonIcon             from '@mui/icons-material/Person';
 import { useAuth }            from '../../contexts/AuthContext';
 
-const QUICK = [
-  { label: 'Admin Access', sub: 'Full system access', icon: AdminPanelSettingsIcon, email: 'admin@pms.com', password: 'admin123', gradient: 'linear-gradient(135deg,#2563eb,#1d4ed8)' },
-  { label: 'User Access',  sub: 'Standard access',   icon: PersonIcon,             email: 'user@pms.com',  password: 'user123',  gradient: 'linear-gradient(135deg,#7c3aed,#5b21b6)' },
-];
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -29,7 +25,7 @@ export default function LoginPage() {
   // Controller-based form — gives MUI full access to value so the floating label
   // tracks correctly even after programmatic setValue() calls.
   const { control, handleSubmit, setValue, formState: { errors } } = useForm({
-    defaultValues: { email: '', password: '' },
+    defaultValues: { username: '', password: '' },
   });
 
   if (user) { navigate('/dashboard'); return null; }
@@ -37,19 +33,12 @@ export default function LoginPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     setError('');
-    await new Promise((r) => setTimeout(r, 500));
-    const result = login(data.email, data.password);
+    const result = await login(data.username, data.password);
     setLoading(false);
     if (result.success) navigate('/dashboard');
     else setError(result.message);
   };
 
-  // Fills email + password only — no layout change, no extra render
-  const fill = (cred) => {
-    setValue('email',    cred.email,    { shouldValidate: false, shouldDirty: true });
-    setValue('password', cred.password, { shouldValidate: false, shouldDirty: true });
-    setError('');
-  };
 
   return (
     <Box
@@ -103,27 +92,26 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-              {/* Email — Controller keeps value in React state so MUI label floats correctly */}
+              {/* Username — Controller keeps value in React state so MUI label floats correctly */}
               <Controller
-                name="email"
+                name="username"
                 control={control}
                 rules={{
-                  required: 'Email is required',
-                  pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email' },
+                  required: 'Username is required',
                 }}
                 render={({ field }) => (
                   <TextField
                     {...field}
                     fullWidth
-                    label="Email Address"
-                    type="email"
-                    autoComplete="email"
-                    error={!!errors.email}
-                    helperText={errors.email?.message}
+                    label="Username"
+                    type="text"
+                    autoComplete="username"
+                    error={!!errors.username}
+                    helperText={errors.username?.message}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                          <PersonIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
                         </InputAdornment>
                       ),
                     }}
@@ -137,7 +125,6 @@ export default function LoginPage() {
                 control={control}
                 rules={{
                   required: 'Password is required',
-                  minLength: { value: 6, message: 'Minimum 6 characters' },
                 }}
                 render={({ field }) => (
                   <TextField
@@ -181,45 +168,6 @@ export default function LoginPage() {
             </Box>
           </form>
 
-          {/* ── Quick Access ── */}
-          <Divider sx={{ my: 2.5 }}>
-            <Typography variant="caption" color="text.disabled" fontWeight={600} letterSpacing="0.06em" textTransform="uppercase">
-              Quick Access
-            </Typography>
-          </Divider>
-
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            {QUICK.map((q) => (
-              <Box
-                key={q.label}
-                onClick={() => fill(q)}
-                sx={{
-                  flex: 1, p: 1.5, borderRadius: 2,
-                  border: 1, borderColor: 'divider',
-                  cursor: 'pointer', transition: 'all 0.15s ease',
-                  display: 'flex', flexDirection: 'column', gap: 0.5,
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    bgcolor: alpha(theme.palette.primary.main, 0.04),
-                    transform: 'translateY(-1px)',
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.12)}`,
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 28, height: 28, borderRadius: 1.5,
-                    background: q.gradient,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 0.5,
-                  }}
-                >
-                  <q.icon sx={{ fontSize: 16, color: '#fff' }} />
-                </Box>
-                <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.2 }}>{q.label}</Typography>
-                <Typography variant="caption" color="text.secondary">{q.sub}</Typography>
-              </Box>
-            ))}
-          </Box>
 
           {/* ── Demo credentials ── */}
           <Box
@@ -233,8 +181,8 @@ export default function LoginPage() {
               Demo Credentials
             </Typography>
             {[
-              ['Admin', 'admin@pms.com / admin123'],
-              ['User',  'user@pms.com / user123'],
+              ['Admin', 'admin / admin123'],
+              ['User',  'user / user123'],
             ].map(([role, cred]) => (
               <Box key={role} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
                 <Typography variant="caption" color="text.secondary">{role}:</Typography>
