@@ -30,6 +30,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
     defaultValues: {
       status: 'Completed',
+      plannedDateTime: '',
       receiverImage: null,
       remarks: '',
     }
@@ -84,11 +85,22 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
     }
 
     try {
+      const actualTime = new Date();
+      const plannedTime = new Date(data.plannedDateTime);
+      const diffMs = actualTime - plannedTime;
+      const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
+      const hh = Math.floor(totalSeconds / 3600);
+      const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const ss = (totalSeconds % 60).toString().padStart(2, '0');
+      const timeDelay = `${hh}:${mm}:${ss}`;
+
       let updatedCount = 0;
       for (const rec of matchedRecords) {
         if (rec._receivingRow) {
           await updateRow('receiving', rec._receivingRow, {
-            "Actual 2": formatTimestamp(),
+            "Planned 2": formatTimestamp(data.plannedDateTime),
+            "Actual 2": formatTimestamp(actualTime),
+            "Time Delay 2": timeDelay,
             "lift Status": data.status,
             "Lifted Image": receiverImageUrl || (receiverFile ? receiverFile.name : '')
           });
@@ -162,7 +174,13 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
-              {/* Reserved for future field */}
+              <TextField
+                fullWidth size="small" label="Planned DateTime *"
+                type="datetime-local"
+                InputLabelProps={{ shrink: true }}
+                {...register('plannedDateTime', { required: 'Planned DateTime is required' })}
+                error={!!errors.plannedDateTime} helperText={errors.plannedDateTime?.message}
+              />
             </Grid>
             <Grid item xs={12}>
               <TextField

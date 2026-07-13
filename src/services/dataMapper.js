@@ -243,8 +243,9 @@ export function mapWorkflowRecords(
       : "";
     const receiveList = logisticLiftNo ? (receivingMap[logisticLiftNo] || []) : [];
     const receive = receiveList.find(r => {
-      const receiveIndentNo = r["Timestamp"] || "";
-      return normalizeIndentNumber(receiveIndentNo) === indentNoNorm;
+      const receiveProd = String(r["Product Name"] || "").trim().toLowerCase();
+      const indentProd = String(row["Item Name"] || "").trim().toLowerCase();
+      return receiveProd === indentProd;
     }) || receiveList[0] || null;
 
     const quantity = parseNum(row["Quantity"]);
@@ -403,6 +404,12 @@ export function mapWorkflowRecords(
       } else {
         baseRecord.workflowStage.liftReceiver = 'Pending';
       }
+
+      baseRecord.liftStatus = receive["lift Status"] || "";
+      baseRecord.liftPlanned = receive["Planned 2"] || "";
+      baseRecord.liftActual = receive["Actual 2"] || "";
+      baseRecord.liftTimeDelay = receive["Time Delay 2"] || "";
+      baseRecord.liftedImage = receive["Lifted Image"] || null;
 
       baseRecord.tallyStatus = receive["Status"] || "";
       baseRecord.tallyPlanned = receive["Planned 3"] || "";

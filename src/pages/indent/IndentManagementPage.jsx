@@ -356,7 +356,7 @@ export default function IndentManagementPage() {
         await gasApi.batchInsert("PO-History", historyRows);
 
         toast.success(`Indent ${indentNumber} submitted with ${activeItems.length} item(s)!`);
-        await refresh();
+        await refresh(['indents', 'poHistory']);
         reset({ companyName: data.companyName, orderBy: '', partyName: '', filterGroup: '', searchItem: '', items: [] });
         setImageFile(null);
         if (imageRef.current) imageRef.current.value = '';

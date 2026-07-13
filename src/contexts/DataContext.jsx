@@ -163,30 +163,75 @@ export function DataProvider({ children }) {
   const [settingsState, setSettingsState] = useState([]);
   const [rawReceiving, setRawReceiving] = useState([]);
   const [rawLogistics, setRawLogistics] = useState([]);
+  const [rawIndents, setRawIndents] = useState([]);
+  const [rawApprovals, setRawApprovals] = useState([]);
+  const [rawFollowUps, setRawFollowUps] = useState([]);
+  const [rawMasterData, setRawMasterData] = useState([]);
+  const [rawUsers, setRawUsers] = useState([]);
+  const [rawWhatsapp, setRawWhatsapp] = useState([]);
+  const [rawPoSentStatus, setRawPoSentStatus] = useState([]);
+  const [rawPoGenerate, setRawPoGenerate] = useState([]);
+  const [rawPoHistory, setRawPoHistory] = useState([]);
   const [headersState, setHeadersState] = useState({});
   const [poHistoryRecords, setPoHistoryRecords] = useState([]);
   const [orderByListState, setOrderByListState] = useState([]);
 
-  const loadData = async (showGlobalLoading = true) => {
+  const loadData = async (showGlobalLoading = true, sheetsToFetch = null) => {
     if (showGlobalLoading) setLoading(true);
     setError(null);
     try {
-      // Call Apps Script bootstrap endpoint
-      const result = await gasApi.bootstrap();
-      
-      const {
-        indents: indentsRaw = [],
-        approvals: approvalsRaw = [],
-        followUps: followUpsRaw = [],
-        logistics: logisticsRaw = [],
-        receiving: receivingRaw = [],
-        masterData: masterDataRaw = [],
-        users: usersRaw = [],
-        whatsapp: whatsappRaw = [],
-        poSentStatus: poSentStatusRaw = [],
-        poGenerate: poGenerateRaw = [],
-        poHistory: poHistoryRaw = []
-      } = result.data || {};
+      let fetchedData = {};
+      if (sheetsToFetch && sheetsToFetch.length > 0) {
+        const activeSheets = [
+          { key: "indents", name: "INDENT-PO" },
+          { key: "whatsapp", name: "Whatsapp Form" },
+          { key: "followUps", name: "Flw-up" },
+          { key: "poGenerate", name: "Po Generate" },
+          { key: "poHistory", name: "PO-History" },
+          { key: "logistics", name: "LIFT-RECEIVED" },
+          { key: "receiving", name: "RECEIVED-ACCOUNTS" },
+          { key: "masterData", name: "Master Data" },
+          { key: "users", name: "Administration" }
+        ];
+
+        const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
+        const promises = targets.map(async (s) => {
+          const res = await gasApi.fetchSheet(s.name);
+          return { key: s.key, data: res.data || [] };
+        });
+        const results = await Promise.all(promises);
+        for (const r of results) {
+          fetchedData[r.key] = r.data;
+        }
+      } else {
+        const result = await gasApi.bootstrap();
+        fetchedData = result.data || {};
+      }
+
+      const indentsRaw = fetchedData.indents !== undefined ? fetchedData.indents : rawIndents;
+      const approvalsRaw = fetchedData.approvals !== undefined ? fetchedData.approvals : rawApprovals;
+      const followUpsRaw = fetchedData.followUps !== undefined ? fetchedData.followUps : rawFollowUps;
+      const logisticsRaw = fetchedData.logistics !== undefined ? fetchedData.logistics : rawLogistics;
+      const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving;
+      const masterDataRaw = fetchedData.masterData !== undefined ? fetchedData.masterData : rawMasterData;
+      const usersRaw = fetchedData.users !== undefined ? fetchedData.users : rawUsers;
+      const whatsappRaw = fetchedData.whatsapp !== undefined ? fetchedData.whatsapp : rawWhatsapp;
+      const poSentStatusRaw = fetchedData.poSentStatus !== undefined ? fetchedData.poSentStatus : rawPoSentStatus;
+      const poGenerateRaw = fetchedData.poGenerate !== undefined ? fetchedData.poGenerate : rawPoGenerate;
+      const poHistoryRaw = fetchedData.poHistory !== undefined ? fetchedData.poHistory : rawPoHistory;
+
+      // Update cached state variables
+      if (fetchedData.indents !== undefined || !sheetsToFetch) setRawIndents(indentsRaw);
+      if (fetchedData.approvals !== undefined || !sheetsToFetch) setRawApprovals(approvalsRaw);
+      if (fetchedData.followUps !== undefined || !sheetsToFetch) setRawFollowUps(followUpsRaw);
+      if (fetchedData.logistics !== undefined || !sheetsToFetch) setRawLogistics(logisticsRaw);
+      if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving(receivingRaw);
+      if (fetchedData.masterData !== undefined || !sheetsToFetch) setRawMasterData(masterDataRaw);
+      if (fetchedData.users !== undefined || !sheetsToFetch) setRawUsers(usersRaw);
+      if (fetchedData.whatsapp !== undefined || !sheetsToFetch) setRawWhatsapp(whatsappRaw);
+      if (fetchedData.poSentStatus !== undefined || !sheetsToFetch) setRawPoSentStatus(poSentStatusRaw);
+      if (fetchedData.poGenerate !== undefined || !sheetsToFetch) setRawPoGenerate(poGenerateRaw);
+      if (fetchedData.poHistory !== undefined || !sheetsToFetch) setRawPoHistory(poHistoryRaw);
 
       const headersMap = {
         indents: getHeaderRow(indentsRaw),
@@ -365,16 +410,35 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
-  const refresh = async () => {
+  const refresh = async (sheetsToFetch = null) => {
     setWriteLoading(true);
     try {
-      await loadData(false);
+      await loadData(false, sheetsToFetch);
     } finally {
       setWriteLoading(false);
     }
   };
 
-
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          bgcolor: 'background.default',
+        }}
+      >
+        <CircularProgress size={50} thickness={4.5} />
+        <Typography variant="body1" fontWeight={600} color="text.secondary">
+          Loading...
+        </Typography>
+      </Box>
+    );
+  }
 
   if (error) {
     return (
