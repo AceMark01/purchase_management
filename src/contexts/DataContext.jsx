@@ -103,19 +103,24 @@ const getHeaderRow = (grid) => {
   return grid[0] || [];
 };
 
-const raw2DArrayToObjects = (grid) => {
+const raw2DArrayToObjects = (grid, sheetName = "") => {
   if (!grid || grid.length === 0) return [];
   
   // Find header row dynamically within the first 10 rows
   let headerRowIndex = 0;
-  for (let i = 0; i < Math.min(grid.length, 10); i++) {
-    const row = grid[i];
-    if (Array.isArray(row) && row.some(cell => {
-      const s = String(cell || "").trim().toLowerCase();
-      return s === "timestamp" || s === "indent number" || s === "request id" || s === "lift no." || s === "product type" || s === "lift no" || s === "ln-lift number" || s === "transporter name" || s === "bill no." || s === "lift status";
-    })) {
-      headerRowIndex = i;
-      break;
+  
+  if (sheetName === "INDENT-PO") {
+    headerRowIndex = 6; // Hardcode header to row 7 (index 6) for INDENT-PO
+  } else {
+    for (let i = 0; i < Math.min(grid.length, 10); i++) {
+      const row = grid[i];
+      if (Array.isArray(row) && row.some(cell => {
+        const s = String(cell || "").trim().toLowerCase();
+        return s === "timestamp" || s === "indent number" || s === "request id" || s === "lift no." || s === "product type" || s === "lift no" || s === "ln-lift number" || s === "transporter name" || s === "bill no." || s === "lift status";
+      })) {
+        headerRowIndex = i;
+        break;
+      }
     }
   }
 
@@ -348,7 +353,7 @@ export function DataProvider({ children }) {
         users: userHeaders
       });
 
-      const indents = raw2DArrayToObjects(indentsRaw);
+      const indents = raw2DArrayToObjects(indentsRaw, "INDENT-PO");
       const approvals = raw2DArrayToObjects(approvalsRaw);
       const followUps = raw2DArrayToObjects(followUpsRaw);
       const logistics = raw2DArrayToObjects(logisticsRaw);

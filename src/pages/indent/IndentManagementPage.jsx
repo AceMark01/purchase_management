@@ -317,6 +317,11 @@ export default function IndentManagementPage() {
         data.companyName
       ]);
 
+      // Ensure that row 7 (header row) has a value in column A. 
+      // The backend's getActualLastRow scans column A to determine where to append.
+      // If column A in row 7 was empty, the backend would mistakenly overwrite row 7.
+      await gasApi.updateCell("INDENT-PO", 7, 1, "Timestamp");
+
       const result = await gasApi.batchInsertIndent("INDENT-PO", rowsData);
       if (result.success) {
         const indentNumber = result.indentNumber || "";

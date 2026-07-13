@@ -7,17 +7,30 @@ export const formatNumber = (val) =>
 export const formatDate = (d, withTime = true) => {
   if (!d) return '';
   const str = String(d).trim();
-  // If already matches DD-MM-YYYY HH:mm:ss, return directly
-  if (/^\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}$/.test(str)) {
+  
+  // If already matches YYYY-MM-DD HH:mm:ss, return directly
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(str)) {
     return str;
   }
-  // If matches DD-MM-YYYY without time, append time if requested
-  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+  // If matches YYYY-MM-DD without time, append time if requested
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     return withTime ? `${str} 00:00:00` : str;
   }
+  
   try {
-    const date = new Date(d);
+    let date;
+    // Parse DD-MM-YYYY format safely if encountered
+    if (/^\d{2}-\d{2}-\d{4}/.test(str)) {
+      const datePart = str.split(' ')[0];
+      const timePart = str.split(' ')[1] || '00:00:00';
+      const [dd, mm, yyyy] = datePart.split('-');
+      date = new Date(`${yyyy}-${mm}-${dd}T${timePart}`);
+    } else {
+      date = new Date(d);
+    }
+    
     if (isNaN(date.getTime())) return str;
+    
     const dd = String(date.getDate()).padStart(2, '0');
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const yyyy = date.getFullYear();
@@ -26,9 +39,9 @@ export const formatDate = (d, withTime = true) => {
     const ss = String(date.getSeconds()).padStart(2, '0');
     
     if (withTime) {
-      return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
+      return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
     }
-    return `${dd}-${mm}-${yyyy}`;
+    return `${yyyy}-${mm}-${dd}`;
   } catch { return str; }
 };
 
@@ -98,5 +111,5 @@ export const formatTimestamp = (d = new Date()) => {
   const hh = pad(date.getHours());
   const min = pad(date.getMinutes());
   const ss = pad(date.getSeconds());
-  return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 };

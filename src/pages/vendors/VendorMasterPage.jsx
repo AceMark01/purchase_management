@@ -56,7 +56,6 @@ function VendorForm({ open, onClose, editItem, onSave }) {
         {...register(name, {
           required: required ? `${label} is required` : false,
           ...(name === 'email' ? { pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email' } } : {}),
-          ...(name === 'gstNumber' ? { pattern: { value: /^[0-9A-Z]{15}$/, message: 'GST must be 15 alphanumeric chars' } } : {}),
         })}
         error={!!errors[name]}
         helperText={errors[name]?.message}

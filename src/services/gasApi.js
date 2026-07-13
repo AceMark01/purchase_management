@@ -46,7 +46,7 @@ async function post(params) {
 
 export const gasApi = {
   fetchSheet: (sheetName) => get({ sheet: sheetName }),
-  // Read operations (sequential fetches for all sheets to avoid preflight/CORS issues)
+  // Read operations (single fetch for all sheets to optimize loading time)
   bootstrap: async () => {
     const activeSheets = [
       { key: "indents", name: "INDENT-PO" },
@@ -59,13 +59,22 @@ export const gasApi = {
       { key: "masterData", name: "Master Data" },
       { key: "users", name: "LOGIN" }
     ];
+    
+    const sheetNames = activeSheets.map(s => s.name).join(",");
+    const res = await post({ action: "fetchMultiple", sheets: sheetNames });
+    
+    if (!res || !res.data) {
+      throw new Error("Failed to fetch multiple sheets");
+    }
+    
     const result = {
       indentForm: [["Request ID", "Timestamp", "Serial No.", "Order By", "Party Name", "Group Name", "Item Name", "Item code", "Discription", "Quantity", "Unit", "Rate", "GST %", "Discount Amount", "Image", "Approx Lead days Item will be dileverd ", "Company Name"]],
     };
+    
     for (const s of activeSheets) {
-      const res = await get({ sheet: s.name });
-      result[s.key] = res.data;
+      result[s.key] = res.data[s.name] || [];
     }
+    
     return { success: true, data: result };
   },
 
