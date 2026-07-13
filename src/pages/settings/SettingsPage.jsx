@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Card, CardContent, CardHeader, Grid, Switch, FormControlLabel,
   Typography, Divider, Button, Chip, Stack, Alert, Table, TableBody,
@@ -31,11 +33,33 @@ const defaultPermissions = {
 };
 
 export default function SettingsPage() {
+  const { settings = [], updateSettingsRow, refresh } = useData();
+  const { user } = useAuth();
+
   const [perms, setPerms] = useState(() => {
     try { const s = localStorage.getItem('pms_settings_perms'); return s ? JSON.parse(s) : defaultPermissions; }
     catch { return defaultPermissions; }
   });
   const [activeRole, setActiveRole] = useState('admin');
+
+  // Sync settings loaded from Google Sheets
+  useEffect(() => {
+    if (settings && settings.length > 0) {
+      const sheetPerms = {};
+      settings.forEach((s) => {
+        if (s.role === 'admin' || s.role === 'user') {
+          sheetPerms[s.role] = {
+            pages: s.pages,
+            actions: s.actions
+          };
+        }
+      });
+      setPerms({
+        admin: sheetPerms.admin || perms.admin || defaultPermissions.admin,
+        user: sheetPerms.user || perms.user || defaultPermissions.user,
+      });
+    }
+  }, [settings]);
 
   const togglePage = (page) => {
     if (page === 'dashboard') return;
@@ -54,12 +78,27 @@ export default function SettingsPage() {
     }));
   };
 
-  const save = () => {
-    localStorage.setItem('pms_settings_perms', JSON.stringify(perms));
-    toast.success('Permissions saved successfully!');
+  const save = async () => {
+    try {
+      for (const role of ROLES) {
+        const sheetRow = settings.find(r => r.role === role);
+        const rowIndex = sheetRow ? sheetRow._row : null;
+        await updateSettingsRow(rowIndex, { role, ...perms[role] }, user?.name || 'Admin');
+      }
+      localStorage.setItem('pms_settings_perms', JSON.stringify(perms));
+      // Sync local storage session permissions if active user's role is updated
+      if (user && perms[user.role]) {
+        localStorage.setItem('pms_permissions', JSON.stringify(perms[user.role]));
+      }
+      await refresh();
+      toast.success('Permissions saved to Google Sheet successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to save settings.');
+    }
   };
 
-  const reset = () => { setPerms(defaultPermissions); toast.info('Permissions reset to defaults!'); };
+  const reset = () => { setPerms(defaultPermissions); toast.info('Permissions reset to defaults! Click Save Settings to persist.'); };
 
   return (
     <Box>
@@ -78,7 +117,7 @@ export default function SettingsPage() {
       </Alert>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
+        <Grid item="true" xs={12} md={8}>
           <Card>
             <CardHeader
               title="Page Access Permissions"
@@ -130,7 +169,7 @@ export default function SettingsPage() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item="true" xs={12} md={4}>
           <Card>
             <CardHeader title="Action Permissions" subheader={`For role: ${activeRole.toUpperCase()}`} />
             <Divider />
@@ -146,7 +185,7 @@ export default function SettingsPage() {
                         color="primary"
                       />
                     }
-                    label={<Typography variant="body2" textTransform="capitalize">{action}</Typography>}
+                    label={<Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{action}</Typography>}
                   />
                 ))}
               </FormGroup>

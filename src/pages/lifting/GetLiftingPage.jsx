@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Box, Button } from '@mui/material';
 import { ViewBtn, PrintBtn } from '../../components/common/ActionButtons';
 import { toast } from 'react-toastify';
-import { completeStage } from '../../store/slices/workflowSlice';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import WorkflowTable, { WORKFLOW_COLUMNS } from '../../components/common/WorkflowTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs from '../../components/common/WorkflowTabs';
@@ -11,7 +12,7 @@ import PageHeader from '../../components/common/PageHeader';
 import { printTable } from '../../utils/exportUtils';
 
 export default function GetLiftingPage() {
-  const dispatch = useDispatch();
+  const { refresh, updateRow } = useData();
   const records = useSelector((s) => s.workflow.records);
   const [tabValue, setTabValue] = useState(0); // 0: Pending, 1: History
   
@@ -19,14 +20,14 @@ export default function GetLiftingPage() {
 
   const stageRecords = useMemo(() => {
     if (tabValue === 0) {
-      return records.filter(r => r.workflowStage.lifting === 'Pending');
+      return records.filter(r => r.workflowStage.logistics === 'Pending');
     } else {
-      return records.filter(r => r.workflowStage.lifting === 'Completed');
+      return records.filter(r => r.workflowStage.logistics === 'Completed');
     }
   }, [records, tabValue]);
 
-  const pendingCount = useMemo(() => records.filter(r => r.workflowStage.lifting === 'Pending').length, [records]);
-  const historyCount = useMemo(() => records.filter(r => r.workflowStage.lifting === 'Completed').length, [records]);
+  const pendingCount = useMemo(() => records.filter(r => r.workflowStage.logistics === 'Pending').length, [records]);
+  const historyCount = useMemo(() => records.filter(r => r.workflowStage.logistics === 'Completed').length, [records]);
 
   const filtered = useMemo(() => stageRecords.filter((i) => {
     const f = appliedFilters;
@@ -41,9 +42,21 @@ export default function GetLiftingPage() {
     );
   }), [stageRecords, appliedFilters]);
 
-  const handleCompleteProcess = (row) => {
-    dispatch(completeStage({ id: row.id, currentStage: 'lifting' }));
-    toast.success(`Lifting completed for Indent ${row.indentNumber} and moved to Receive Material.`);
+  const handleCompleteProcess = async (row) => {
+    if (!row._receivingRow) {
+      toast.error("Receiving row index not found for this record.");
+      return;
+    }
+    try {
+      await updateRow('receiving', row._receivingRow, {
+        "lift Status": "Completed"
+      });
+      toast.success(`Lifting completed for Indent ${row.indentNumber}.`);
+      await refresh();
+    } catch (err) {
+      console.error("Failed to complete lifting:", err);
+      toast.error(err.message || "Failed to update lifting status in database.");
+    }
   };
 
   const actions = useCallback((row) => {
@@ -59,7 +72,7 @@ export default function GetLiftingPage() {
         <PrintBtn key="print" onClick={() => printTable([row], WORKFLOW_COLUMNS.map((c) => ({ key: c.key, header: c.label })), `Lifting for ${row.indentNumber}`)} />
       ];
     }
-  }, [tabValue, dispatch]);
+  }, [tabValue]);
 
   return (
     <Box>

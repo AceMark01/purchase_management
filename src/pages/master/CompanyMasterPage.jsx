@@ -16,9 +16,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BusinessIcon from '@mui/icons-material/Business';
 import { toast } from 'react-toastify';
-import { addCompany, updateCompany, deleteCompany } from '../../store/slices/companySlice';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import { formatDate, statusColor } from '../../utils/formatters';
 
 const DEPARTMENTS = [
@@ -38,8 +39,7 @@ function getComparator(order, orderBy) {
 }
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
-function CompanyForm({ open, onClose, editItem }) {
-  const dispatch = useDispatch();
+function CompanyForm({ open, onClose, editItem, onSave }) {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
       companyName: '', gstNumber: '', panNumber: '', email: '',
@@ -49,13 +49,7 @@ function CompanyForm({ open, onClose, editItem }) {
   });
 
   const onSubmit = (data) => {
-    if (editItem) {
-      dispatch(updateCompany({ ...editItem, ...data }));
-      toast.success('Company updated successfully!');
-    } else {
-      dispatch(addCompany(data));
-      toast.success('Company created successfully!');
-    }
+    onSave(data);
     reset();
     onClose();
   };
@@ -185,30 +179,29 @@ function ViewDialog({ open, onClose, item }) {
 
 /* ── Main Page ─────────────────────────────────────────────── */
 const TABLE_COLUMNS = [
-  { id: 'companyName',      label: 'Company Name',       minWidth: 160 },
-  { id: 'gstNumber',        label: 'GST Number',         minWidth: 160 },
-  { id: 'panNumber',        label: 'PAN Number',         minWidth: 120 },
-  { id: 'email',            label: 'Email',              minWidth: 170 },
-  { id: 'phoneNumber',      label: 'Phone Number',       minWidth: 130 },
-  { id: 'responsiblePerson',label: 'Responsible Person', minWidth: 150 },
-  { id: 'destination',      label: 'Destination',        minWidth: 120 },
-  { id: 'status',           label: 'Status',             minWidth: 100 },
-  { id: 'createdDate',      label: 'Created Date',       minWidth: 120 },
+  { id: 'companyName', label: 'Company Name', minWidth: 160 },
+  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
+  { id: 'panNumber', label: 'PAN Number', minWidth: 120 },
+  { id: 'email', label: 'Email', minWidth: 170 },
+  { id: 'phoneNumber', label: 'Phone Number', minWidth: 130 },
+  { id: 'responsiblePerson', label: 'Responsible Person', minWidth: 150 },
+  { id: 'destination', label: 'Destination', minWidth: 120 },
+  { id: 'status', label: 'Status', minWidth: 100 },
+  { id: 'createdDate', label: 'Created Date', minWidth: 120 },
 ];
 
 export default function CompanyMasterPage() {
-  const dispatch = useDispatch();
-  const items = useSelector((s) => s.companies.items);
+  const { companies: items = [], refresh, updateRow } = useData();
 
-  const [formOpen,   setFormOpen]   = useState(false);
-  const [viewOpen,   setViewOpen]   = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selected,   setSelected]   = useState(null);
-  const [search,     setSearch]     = useState('');
-  const [order,      setOrder]      = useState('asc');
-  const [orderBy,    setOrderBy]    = useState('companyName');
-  const [page,       setPage]       = useState(0);
-  const [rowsPerPage,setRowsPerPage]= useState(10);
+  const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState('');
+  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('companyName');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const handleSort = (col) => {
     const isAsc = orderBy === col && order === 'asc';
@@ -235,11 +228,73 @@ export default function CompanyMasterPage() {
     sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [sorted, page, rowsPerPage]);
 
-  const handleDelete = () => {
-    dispatch(deleteCompany(selected.id));
-    toast.success('Company deleted successfully!');
-    setDeleteOpen(false);
-    setSelected(null);
+  const handleSave = async (data) => {
+    const isEdit = !!selected;
+    try {
+      let result;
+      const todayStr = formatDate(new Date());
+      const payload = {
+        "Company Name": data.companyName,
+        "GST number": data.gstNumber,
+        "PAN Number": data.panNumber,
+        "Email": data.email,
+        "Phone Number": data.phoneNumber,
+        "Responsible Department": data.responsibleDepartment,
+        "Responsible Person Name": data.responsiblePerson,
+        "Company Address": data.companyAddress,
+        "Billing Address": data.billingAddress,
+        "Destination": data.destination,
+        "Status": data.status,
+        "Created Date": isEdit ? (selected.createdDate || todayStr) : todayStr,
+        "Updated Date": todayStr,
+      };
+
+      if (isEdit) {
+        await updateRow('companies', selected._row, payload);
+        result = { success: true };
+      } else {
+        const rowValues = [
+          payload["Company Name"],
+          payload["GST number"],
+          payload["PAN Number"],
+          payload["Email"],
+          payload["Phone Number"],
+          payload["Responsible Department"],
+          payload["Responsible Person Name"],
+          payload["Company Address"],
+          payload["Billing Address"],
+          payload["Destination"],
+          payload["Status"],
+          payload["Created Date"],
+          payload["Updated Date"]
+        ];
+        result = await gasApi.insertInColumns("Master Data", 13, rowValues, 2);
+      }
+
+      if (result.success) {
+        toast.success(isEdit ? 'Company updated!' : 'Company created!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to save company.");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const result = await gasApi.deleteRowInColumns("Master Data", selected._row, 13, 13);
+      if (result.success) {
+        toast.success('Company deleted successfully!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete company.");
+    } finally {
+      setDeleteOpen(false);
+      setSelected(null);
+    }
   };
 
   return (
@@ -352,6 +407,7 @@ export default function CompanyMasterPage() {
           open={formOpen}
           onClose={() => { setFormOpen(false); setSelected(null); }}
           editItem={selected}
+          onSave={handleSave}
         />
       )}
       <ViewDialog open={viewOpen} onClose={() => { setViewOpen(false); setSelected(null); }} item={selected} />

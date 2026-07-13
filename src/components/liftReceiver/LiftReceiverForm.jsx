@@ -1,16 +1,18 @@
-import React from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  TextField, Box, Typography, IconButton, Grid, MenuItem, Divider
+  TextField, Box, Typography, IconButton, Grid, MenuItem, Divider, CircularProgress
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import MoveToInboxIcon from '@mui/icons-material/MoveToInbox';
+import { useData } from '../../contexts/DataContext';
+import { formatTimestamp } from '../../utils/formatters';
+import { gasApi } from '../../services/gasApi';
 import { toast } from 'react-toastify';
-import { completeStage, updateRecord } from '../../store/slices/workflowSlice';
 
 const SectionLabel = ({ children }) => (
   <Typography variant="caption" fontWeight={700} color="text.secondary"
@@ -20,7 +22,10 @@ const SectionLabel = ({ children }) => (
 );
 
 export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
-  const dispatch = useDispatch();
+  const allRecords = useSelector((state) => state.workflow.records) || [];
+  const { refresh, updateRow } = useData();
+  const [receiverFile, setReceiverFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
     defaultValues: {
@@ -35,19 +40,77 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const fileUrl = URL.createObjectURL(file);
-      setValue('receiverImage', { name: file.name, url: fileUrl });
+      setReceiverFile(file);
+      setValue('receiverImage', { name: file.name, url: URL.createObjectURL(file) });
     }
   };
 
-  const onSubmit = (data) => {
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
+  const onSubmit = async (data) => {
+    if (!record || !record.liftNo) {
+      toast.error("Lift Number not found for verification.");
+      return;
+    }
+
     const ids = groupIds?.length ? groupIds : [record.id];
-    ids.forEach(id => {
-      dispatch(updateRecord({ id, liftReceiverDetails: data }));
-      dispatch(completeStage({ id, currentStage: 'liftReceiver', nextStageOverride: 'tallyEntry' }));
-    });
-    toast.success(`Lift Receiver verified! ${ids.length} item(s) moved to Tally Entry.`);
-    onClose();
+    const matchedRecords = allRecords.filter(r => ids.includes(r.id));
+
+    setIsSubmitting(true);
+    let receiverImageUrl = '';
+    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+
+    if (receiverFile && folderId) {
+      try {
+        const base64Data = await fileToBase64(receiverFile);
+        const uploadRes = await gasApi.uploadFile({
+          base64Data,
+          fileName: receiverFile.name,
+          mimeType: receiverFile.type,
+          folderId,
+        });
+        if (uploadRes.success) {
+          receiverImageUrl = uploadRes.fileUrl;
+        }
+      } catch (err) {
+        console.error("Failed to upload receiver verification image:", err);
+        toast.warning("Failed to upload image to Google Drive, proceeding without upload.");
+      }
+    }
+
+    try {
+      let updatedCount = 0;
+      for (const rec of matchedRecords) {
+        if (rec._receivingRow) {
+          await updateRow('receiving', rec._receivingRow, {
+            "Actual 2": formatTimestamp(),
+            "lift Status": data.status,
+            "Lifted Image": receiverImageUrl || (receiverFile ? receiverFile.name : '')
+          });
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount === 0) {
+        toast.error("No receiving row indexes found for the selected records.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      toast.success(`Lift Receiver verified for ${updatedCount} item(s)!`);
+      await refresh();
+      onClose();
+    } catch (err) {
+      console.error("Failed to verify lift:", err);
+      toast.error(err.message || "Failed to save verification status to database.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -71,7 +134,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
             <MoveToInboxIcon sx={{ color: 'warning.main', fontSize: 20 }} />
           </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>Lift Receiver Verification</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Lift Receiver Verification</Typography>
             {record && (
               <Typography variant="caption" color="text.secondary">Indent: {record.indentNumber} &nbsp;·&nbsp; {record.itemName}</Typography>
             )}
@@ -143,8 +206,8 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
         {/* ── Footer ── */}
         <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', gap: 1 }}>
           <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38 }}>Cancel</Button>
-          <Button type="submit" form="receiver-form" variant="contained" color="warning" sx={{ minWidth: 150, height: 38, color: 'white' }}>
-            Save & Submit
+          <Button type="submit" form="receiver-form" variant="contained" color="warning" disabled={isSubmitting} sx={{ minWidth: 150, height: 38, color: 'white' }}>
+            {isSubmitting ? 'Saving...' : 'Save & Submit'}
           </Button>
         </DialogActions>
       </Box>

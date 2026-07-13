@@ -1,3 +1,5 @@
+import { formatDate } from './formatters';
+
 // Groups workflow records by poNumber so every downstream stage shows ONE row per PO.
 // Records without a poNumber stay as individual entries.
 export const groupByPO = (records) => {
@@ -43,5 +45,5 @@ export const PO_COLUMNS = [
       })}`,
   },
   { key: 'status',       label: 'Status',    type: 'status', minWidth: 120 },
-  { key: 'createdDate',  label: 'Date',               minWidth: 120 },
+  { key: 'createdDate',  label: 'Date',               minWidth: 120, render: (v) => formatDate(v) },
 ];

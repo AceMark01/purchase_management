@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import { useSelector } from 'react-redux';
 import {
   Box, Button, Grid, TextField, MenuItem, Typography, Card, CardContent,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Paper, IconButton, Divider, alpha, useTheme, Chip, InputAdornment, Tooltip,
   TablePagination,
+  CircularProgress,
 } from '@mui/material';
 import DeleteIcon       from '@mui/icons-material/Delete';
 import CloudUploadIcon  from '@mui/icons-material/CloudUpload';
@@ -13,8 +15,10 @@ import SaveIcon         from '@mui/icons-material/Save';
 import SearchIcon       from '@mui/icons-material/Search';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { toast } from 'react-toastify';
-import { VENDORS } from '../../data/mockData';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import { exportToExcel } from '../../utils/exportUtils';
+import { formatTimestamp } from '../../utils/formatters';
 
 const ORDER_BY_LIST = [
   'Admin User', 'John Smith', 'Sarah Johnson', 'Emma Davis',
@@ -39,39 +43,15 @@ export default function WhatsAppFormPage() {
   const isDark = theme.palette.mode === 'dark';
   const slipRef = useRef(null);
 
-  const [entries,  setEntries]  = useState([
-    {
-      id: 1,
-      timestamp: new Date().toLocaleString('en-IN'),
-      partyName: 'CleanPaper Co.',
-      slipImage: 'order_slip_001.pdf',
-      orderBy: 'Admin User',
-      email: 'admin@pms.com',
-      _fileObj: null,
-    },
-    {
-      id: 2,
-      timestamp: new Date(Date.now() - 3600000).toLocaleString('en-IN'),
-      partyName: 'Vidadri Paper Raipur',
-      slipImage: 'whatsapp_image.jpg',
-      orderBy: 'John Smith',
-      email: 'vidadri@example.com',
-      _fileObj: null,
-    },
-    {
-      id: 3,
-      timestamp: new Date(Date.now() - 86400000).toLocaleString('en-IN'),
-      partyName: 'Sharma Traders',
-      slipImage: 'PO_Sharma.png',
-      orderBy: 'Mr. Sharma',
-      email: 'sharma@traders.com',
-      _fileObj: null,
-    }
-  ]);
+  const { whatsappEntries: entries, refresh, addRow } = useData();
+  const vendors = useSelector((s) => s.vendorMaster.items) || [];
+
   const [slipFile, setSlipFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search,   setSearch]   = useState('');
   const [page,     setPage]     = useState(0);
   const [rpp,      setRpp]      = useState(10);
+
 
   const { register, control, handleSubmit, reset } = useForm({
     defaultValues: {
@@ -82,30 +62,81 @@ export default function WhatsAppFormPage() {
     },
   });
 
-  const onSave = (data) => {
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
+  const onSave = async (data) => {
     if (!data.partyName) { toast.error('Party Name is required'); return; }
-    const entry = {
-      id:        Date.now(),
-      timestamp: new Date(data.timestamp).toLocaleString('en-IN'),
-      partyName: data.partyName,
-      slipImage: slipFile ? slipFile.name : '—',
-      orderBy:   data.orderBy || '—',
-      email:     data.email   || '—',
-      _fileObj:  slipFile,
-    };
-    setEntries(prev => [entry, ...prev]);
-    toast.success('WhatsApp order entry saved!');
-    reset({
-      timestamp: new Date().toISOString().slice(0, 16),
-      partyName: '', orderBy: '', email: '',
-    });
-    setSlipFile(null);
-    if (slipRef.current) slipRef.current.value = '';
+    setIsSubmitting(true);
+    let fileUrl = '';
+    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+
+    if (slipFile && folderId) {
+      try {
+        const base64Data = await fileToBase64(slipFile);
+        const uploadRes = await gasApi.uploadFile({
+          base64Data,
+          fileName: slipFile.name,
+          mimeType: slipFile.type,
+          folderId,
+        });
+        if (uploadRes.success) {
+          fileUrl = uploadRes.fileUrl;
+        }
+      } catch (err) {
+        console.error("Failed to upload slip file:", err);
+        toast.warning("Failed to upload slip file to Google Drive, proceeding without upload.");
+      }
+    }
+
+    try {
+      const payload = {
+        "timestamp": formatTimestamp(data.timestamp),
+        "Party Name": data.partyName,
+        "Slip Image": fileUrl || (slipFile ? slipFile.name : ''),
+        "Order By": data.orderBy || '',
+        "Email Address": data.email || ''
+      };
+      
+      const result = await addRow('whatsapp', payload);
+      if (result.success) {
+        toast.success('WhatsApp order entry saved!');
+        await refresh();
+        reset({
+          timestamp: formatTimestamp().slice(0, 16),
+          partyName: '', orderBy: '', email: '',
+        });
+        setSlipFile(null);
+        if (slipRef.current) slipRef.current.value = '';
+      }
+    } catch (err) {
+      console.error("Failed to save WhatsApp entry:", err);
+      toast.error(err.message || "Failed to save entry.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id) => {
-    setEntries(prev => prev.filter(e => e.id !== id));
-    toast.info('Entry removed');
+  const handleDelete = async (id) => {
+    const target = entries.find(e => e.id === id);
+    if (!target) return;
+    try {
+      setIsSubmitting(true);
+      const result = await gasApi.removeResource('whatsapp', target.timestamp);
+      if (result.success) {
+        toast.info('Entry removed');
+        await refresh();
+      }
+    } catch (err) {
+      console.error("Failed to delete entry:", err);
+      toast.error(err.message || "Failed to remove entry.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filtered = entries.filter(e => {
@@ -128,7 +159,7 @@ export default function WhatsAppFormPage() {
           borderRadius: 3, border: '1px solid', borderColor: isDark ? 'rgba(37,211,102,.2)' : 'rgba(37,211,102,.25)',
         }}
       >
-        <Box display="flex" alignItems="center" justifyContent="center" gap={1.5} mb={0.5}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 0.5 }}>
           <Box sx={{ bgcolor: '#25d366', color: 'white', borderRadius: 2, p: 0.8, display: 'flex' }}>
             <WhatsAppIcon sx={{ fontSize: 28 }} />
           </Box>
@@ -180,11 +211,11 @@ export default function WhatsAppFormPage() {
                 <Controller name="partyName" control={control} render={({ field }) => (
                   <TextField {...field} select fullWidth size="small" sx={INPUT_SX}>
                     <MenuItem value=""><em>— Select Party —</em></MenuItem>
-                    {VENDORS.map(v => <MenuItem key={v.id} value={v.name}>{v.name}</MenuItem>)}
+                    {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                   </TextField>
                 )} />
               </Grid>
-
+ 
               {/* Slip Image */}
               <Grid item xs={12} sm={6} md={2.2}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
@@ -206,7 +237,7 @@ export default function WhatsAppFormPage() {
                   />
                 </Button>
               </Grid>
-
+ 
               {/* Order By */}
               <Grid item xs={12} sm={6} md={2.1}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
@@ -219,7 +250,7 @@ export default function WhatsAppFormPage() {
                   </TextField>
                 )} />
               </Grid>
-
+ 
               {/* Email */}
               <Grid item xs={12} sm={6} md={2}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
@@ -231,12 +262,13 @@ export default function WhatsAppFormPage() {
                   placeholder="email@example.com" sx={INPUT_SX}
                 />
               </Grid>
-
+ 
               {/* Save Button */}
-              <Grid item xs={12} sm={6} md={1}>
+              <Grid item xs={12} sm={6} md={1.5}>
                 <Button
                   type="submit" variant="contained" fullWidth
-                  startIcon={<SaveIcon sx={{ fontSize: 16 }} />}
+                  disabled={isSubmitting}
+                  startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
                   sx={{
                     height: 38, textTransform: 'none', fontWeight: 700,
                     bgcolor: '#25d366', '&:hover': { bgcolor: '#1da851' },
@@ -244,7 +276,7 @@ export default function WhatsAppFormPage() {
                     fontSize: '0.85rem',
                   }}
                 >
-                  Save
+                  {isSubmitting ? 'Saving...' : 'Save'}
                 </Button>
               </Grid>
 
@@ -315,7 +347,7 @@ export default function WhatsAppFormPage() {
               {paginated.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={WA_COLS.length + 2} align="center" sx={{ py: 6 }}>
-                    <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <Box sx={{ bgcolor: 'rgba(37,211,102,.1)', borderRadius: '50%', p: 2, display: 'flex' }}>
                         <WhatsAppIcon sx={{ fontSize: 32, color: '#25d366' }} />
                       </Box>
@@ -350,7 +382,7 @@ export default function WhatsAppFormPage() {
 
                   {/* Party Name */}
                   <TableCell sx={{ py: 1.2, px: 2 }}>
-                    <Box display="flex" alignItems="center" gap={0.8}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#25d366', flexShrink: 0 }} />
                       <Typography variant="body2" fontWeight={700} color="primary.main">
                         {entry.partyName}
@@ -360,14 +392,18 @@ export default function WhatsAppFormPage() {
 
                   {/* Slip Image */}
                   <TableCell sx={{ py: 1.2, px: 2 }}>
-                    {entry._fileObj ? (
-                      <a
-                        href={URL.createObjectURL(entry._fileObj)}
-                        target="_blank" rel="noreferrer"
-                        style={{ color: '#25d366', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}
-                      >
-                        📎 {entry.slipImage}
-                      </a>
+                    {entry.slipImage && entry.slipImage !== '—' && entry.slipImage !== '' ? (
+                      String(entry.slipImage).startsWith('http') ? (
+                        <a
+                          href={entry.slipImage}
+                          target="_blank" rel="noreferrer"
+                          style={{ color: '#25d366', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}
+                        >
+                          🔗 View Document
+                        </a>
+                      ) : (
+                        <Typography variant="body2" fontSize="0.8rem">📎 {entry.slipImage}</Typography>
+                      )
                     ) : (
                       <Typography variant="body2" color="text.disabled" fontSize="0.8rem">—</Typography>
                     )}

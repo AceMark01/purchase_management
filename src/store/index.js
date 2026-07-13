@@ -5,16 +5,13 @@ import notificationReducer from './slices/notificationSlice';
 import companyReducer from './slices/companySlice';
 import vendorReducer from './slices/vendorSlice';
 
-const CACHE_KEY = 'pms_cache_v4';
+const CACHE_KEY = 'pms_cache_v5';
 
 const loadState = () => {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw);
-    // Basic validation - must have workflow.records array
-    if (!parsed?.workflow?.records || !Array.isArray(parsed.workflow.records)) return undefined;
-    return parsed;
+    return JSON.parse(raw);
   } catch {
     return undefined;
   }
@@ -23,7 +20,6 @@ const loadState = () => {
 const saveState = (state) => {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      workflow: state.workflow,
       vendorMaster: state.vendorMaster,
       companies: state.companies,
     }));

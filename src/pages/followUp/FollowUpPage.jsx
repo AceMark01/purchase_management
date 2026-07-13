@@ -1,20 +1,20 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useSelector }  from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Box, Button } from '@mui/material';
-import { ViewBtn }     from '../../components/common/ActionButtons';
-import DataTable              from '../../components/common/DataTable';
+import { ViewBtn } from '../../components/common/ActionButtons';
+import DataTable from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
-import WorkflowTabs           from '../../components/common/WorkflowTabs';
-import PageHeader             from '../../components/common/PageHeader';
-import CompleteFollowUpForm   from '../../components/followUp/CompleteFollowUpForm';
+import WorkflowTabs from '../../components/common/WorkflowTabs';
+import PageHeader from '../../components/common/PageHeader';
+import CompleteFollowUpForm from '../../components/followUp/CompleteFollowUpForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 
 export default function FollowUpPage() {
   const records = useSelector((s) => s.workflow.records);
 
-  const [tabValue,       setTabValue]       = useState(0);
-  const [formOpen,       setFormOpen]       = useState(false);
-  const [selectedRow,    setSelectedRow]    = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  const [formOpen, setFormOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
 
   const stageRecords = useMemo(() => {
@@ -31,16 +31,16 @@ export default function FollowUpPage() {
     stageRecords.filter((i) => {
       const f = appliedFilters;
       return (
-        (!f.partyName   || i.partyName.toLowerCase().includes(f.partyName.toLowerCase()))     &&
+        (!f.partyName || i.partyName.toLowerCase().includes(f.partyName.toLowerCase())) &&
         (!f.companyName || i.companyName.toLowerCase().includes(f.companyName.toLowerCase())) &&
-        (!f.status      || i.status === f.status)                                             &&
-        (!f.dateFrom    || i.createdDate >= f.dateFrom)                                       &&
-        (!f.dateTo      || i.createdDate <= f.dateTo)
+        (!f.status || i.status === f.status) &&
+        (!f.dateFrom || i.createdDate >= f.dateFrom) &&
+        (!f.dateTo || i.createdDate <= f.dateTo)
       );
     }), [stageRecords, appliedFilters]);
 
-  const handleOpenForm  = (row) => { setSelectedRow(row); setFormOpen(true); };
-  const handleCloseForm = ()    => { setFormOpen(false); setSelectedRow(null); };
+  const handleOpenForm = (row) => { setSelectedRow(row); setFormOpen(true); };
+  const handleCloseForm = () => { setFormOpen(false); setSelectedRow(null); };
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {
@@ -51,7 +51,7 @@ export default function FollowUpPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => {}} />];
+    return [<ViewBtn key="view" onClick={() => { }} />];
   }, [tabValue]);
 
   return (

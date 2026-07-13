@@ -9,7 +9,8 @@ import SendIcon      from '@mui/icons-material/Send';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { ViewBtn }   from '../../components/common/ActionButtons';
 import { toast }     from 'react-toastify';
-import { completeStage, updateRecord } from '../../store/slices/workflowSlice';
+import { useData } from '../../contexts/DataContext';
+import { formatTimestamp } from '../../utils/formatters';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -33,7 +34,7 @@ const getHistoryCols = (onViewPO) => [
 ];
 
 export default function SendPOToPartyPage() {
-  const dispatch = useDispatch();
+  const { refresh, updateRow } = useData();
   const records  = useSelector((s) => s.workflow.records);
 
   const [tabValue,       setTabValue]       = useState(0);
@@ -72,18 +73,25 @@ export default function SendPOToPartyPage() {
     setFormOpen(true);
   };
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     if (!selectedRow) return;
-    const ids = selectedRow._groupIds || [selectedRow.id];
+    try {
+      const ids = selectedRow._groupIds || [selectedRow.id];
+      for (const id of ids) {
+        await updateRow('indents', id, {
+          "Actual4.1": formatTimestamp(data.sentDate),
+          "PO Sent Status": "Sent"
+        });
+      }
 
-    ids.forEach(id => {
-      dispatch(updateRecord({ id, sendPOMessage: data.message, sentDate: data.sentDate }));
-      dispatch(completeStage({ id, currentStage: 'sendPO', nextStageOverride: 'followUp' }));
-    });
-
-    toast.success(`PO ${selectedRow.poNumber} sent to ${selectedRow.partyName}! ${ids.length} item(s) moved to Follow-Up.`);
-    setFormOpen(false);
-    setSelectedRow(null);
+      toast.success(`PO ${selectedRow.poNumber} sent to ${selectedRow.partyName}!`);
+      await refresh();
+      setFormOpen(false);
+      setSelectedRow(null);
+    } catch (err) {
+      console.error("Failed to send PO:", err);
+      toast.error(err.message || "Failed to save PO sent status to database.");
+    }
   };
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
@@ -130,7 +138,7 @@ export default function SendPOToPartyPage() {
             <SendIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>Send PO to Party</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Send PO to Party</Typography>
             {selectedRow && (
               <Typography variant="caption" color="text.secondary">
                 {selectedRow.poNumber} · {selectedRow.partyName} · {selectedRow._itemCount || 1} item(s)

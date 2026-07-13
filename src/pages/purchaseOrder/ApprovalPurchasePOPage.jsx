@@ -10,7 +10,8 @@ import ThumbUpIcon     from '@mui/icons-material/ThumbUp';
 import OpenInNewIcon   from '@mui/icons-material/OpenInNew';
 import { ViewBtn, PrintBtn } from '../../components/common/ActionButtons';
 import { toast }              from 'react-toastify';
-import { completeStage, updateRecord } from '../../store/slices/workflowSlice';
+import { useData } from '../../contexts/DataContext';
+import { formatTimestamp } from '../../utils/formatters';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -54,11 +55,9 @@ const getHistoryCols = (onViewPO) => [
       </Link>
     ) : '—',
   },
-];
-
-export default function ApprovalPurchasePOPage() {
-  const dispatch = useDispatch();
-  const records  = useSelector((s) => s.workflow.records);
+];export default function ApprovalPurchasePOPage() {
+  const { refresh, updateRow } = useData();
+  const records = useSelector((s) => s.workflow.records);
 
   const [tabValue,       setTabValue]       = useState(0);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
@@ -97,26 +96,34 @@ export default function ApprovalPurchasePOPage() {
     setConfirmOpen(true);
   };
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     if (!selectedRow) return;
-    const ids = selectedRow._groupIds || [selectedRow.id];
+    try {
+      const ids = selectedRow._groupIds || [selectedRow.id];
+      const actionDate = formatTimestamp();
+      const poDate = selectedRow.poDate || "";
 
-    ids.forEach(id => {
-      dispatch(updateRecord({ id, status: data.status, approvalRemarks: data.remarks }));
-      if (data.status === 'Approved') {
-        dispatch(completeStage({ id, currentStage: 'approvalPO', nextStageOverride: 'sendPO' }));
-      } else {
-        dispatch(completeStage({ id, currentStage: 'approvalPO' }));
+      for (const id of ids) {
+        await updateRow('indents', id, {
+          "Planned4": poDate,
+          "Actual4": actionDate,
+          "Approval Status": data.status,
+          "Approval Remarks": data.remarks
+        });
       }
-    });
 
-    if (data.status === 'Approved') {
-      toast.success(`PO ${selectedRow.poNumber} Approved! ${ids.length} item(s) moved to Send PO.`);
-    } else {
-      toast.error(`PO ${selectedRow.poNumber} Rejected.`);
+      if (data.status === 'Approved') {
+        toast.success(`PO ${selectedRow.poNumber} Approved!`);
+      } else {
+        toast.error(`PO ${selectedRow.poNumber} Rejected.`);
+      }
+      await refresh();
+      setConfirmOpen(false);
+      setSelectedRow(null);
+    } catch (err) {
+      console.error("Failed to approve PO:", err);
+      toast.error(err.message || "Failed to submit PO approval to database.");
     }
-    setConfirmOpen(false);
-    setSelectedRow(null);
   };
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
@@ -163,7 +170,7 @@ export default function ApprovalPurchasePOPage() {
             <CheckCircleIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>Approve Purchase Order</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Approve Purchase Order</Typography>
             {selectedRow && (
               <Typography variant="caption" color="text.secondary">
                 {selectedRow.poNumber} · {selectedRow.partyName} · {selectedRow._itemCount || 1} item(s)

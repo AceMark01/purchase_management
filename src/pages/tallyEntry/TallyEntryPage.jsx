@@ -14,6 +14,40 @@ import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 
 const getHistoryCols = (onViewPO) => [
   ...PO_COLUMNS,
+  { key: 'tallyStatus', label: 'Tally Status', minWidth: 110 },
+  { key: 'tallyPlanned', label: 'Planned 3', minWidth: 155 },
+  { key: 'tallyActual', label: 'Actual 3', minWidth: 155 },
+  { key: 'tallyTimeDelay', label: 'Time Delay', minWidth: 110 },
+  {
+    key: 'poAttach',
+    label: 'PO Attach',
+    minWidth: 110,
+    render: (_v, row) => row.poAttach ? (
+      <Link href={row.poAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+        View PO
+      </Link>
+    ) : '—',
+  },
+  {
+    key: 'biltyAttach',
+    label: 'Bilty Attach',
+    minWidth: 110,
+    render: (_v, row) => row.biltyAttach ? (
+      <Link href={row.biltyAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+        View Bilty
+      </Link>
+    ) : '—',
+  },
+  {
+    key: 'invoiceAttach',
+    label: 'Invoice Attach',
+    minWidth: 120,
+    render: (_v, row) => row.invoiceAttach ? (
+      <Link href={row.invoiceAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+        View Invoice
+      </Link>
+    ) : '—',
+  },
   {
     key: 'poViewLink',
     label: 'PO Document',

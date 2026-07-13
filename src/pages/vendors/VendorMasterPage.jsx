@@ -16,9 +16,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import { toast } from 'react-toastify';
-import { addVendor, updateVendor, deleteVendor } from '../../store/slices/vendorSlice';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import { formatDate } from '../../utils/formatters';
 
 /* ── helpers ──────────────────────────────────────────────── */
@@ -34,8 +35,7 @@ function getComparator(order, orderBy) {
 }
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
-function VendorForm({ open, onClose, editItem }) {
-  const dispatch = useDispatch();
+function VendorForm({ open, onClose, editItem, onSave }) {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
       vendorName: '', gstNumber: '', email: '', phoneNumber: '',
@@ -44,13 +44,7 @@ function VendorForm({ open, onClose, editItem }) {
   });
 
   const onSubmit = (data) => {
-    if (editItem) {
-      dispatch(updateVendor({ ...editItem, ...data }));
-      toast.success('Vendor updated successfully!');
-    } else {
-      dispatch(addVendor(data));
-      toast.success('Vendor created successfully!');
-    }
+    onSave(data);
     reset();
     onClose();
   };
@@ -156,28 +150,27 @@ function ViewDialog({ open, onClose, item }) {
 
 /* ── Main Page ─────────────────────────────────────────────── */
 const TABLE_COLUMNS = [
-  { id: 'vendorName',    label: 'Vendor Name',     minWidth: 160 },
-  { id: 'gstNumber',    label: 'GST Number',       minWidth: 160 },
-  { id: 'email',         label: 'Email',            minWidth: 170 },
-  { id: 'phoneNumber',  label: 'Phone Number',     minWidth: 130 },
-  { id: 'contactPerson',label: 'Contact Person',   minWidth: 140 },
-  { id: 'vendorLocation',label: 'Vendor Location', minWidth: 140 },
-  { id: 'status',        label: 'Status',           minWidth: 100 },
-  { id: 'createdDate',  label: 'Created Date',     minWidth: 120 },
+  { id: 'vendorName', label: 'Vendor Name', minWidth: 160 },
+  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
+  { id: 'email', label: 'Email', minWidth: 170 },
+  { id: 'phoneNumber', label: 'Phone Number', minWidth: 130 },
+  { id: 'contactPerson', label: 'Contact Person', minWidth: 140 },
+  { id: 'vendorLocation', label: 'Vendor Location', minWidth: 140 },
+  { id: 'status', label: 'Status', minWidth: 100 },
+  { id: 'createdDate', label: 'Created Date', minWidth: 120 },
 ];
 
 export default function VendorMasterPage() {
-  const dispatch = useDispatch();
-  const items = useSelector((s) => s.vendorMaster.items);
+  const { vendors: items = [], refresh, updateRow } = useData();
 
-  const [formOpen,    setFormOpen]    = useState(false);
-  const [viewOpen,    setViewOpen]    = useState(false);
-  const [deleteOpen,  setDeleteOpen]  = useState(false);
-  const [selected,    setSelected]    = useState(null);
-  const [search,      setSearch]      = useState('');
-  const [order,       setOrder]       = useState('asc');
-  const [orderBy,     setOrderBy]     = useState('vendorName');
-  const [page,        setPage]        = useState(0);
+  const [formOpen, setFormOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState('');
+  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('vendorName');
+  const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const handleSort = (col) => {
@@ -205,11 +198,67 @@ export default function VendorMasterPage() {
     sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [sorted, page, rowsPerPage]);
 
-  const handleDelete = () => {
-    dispatch(deleteVendor(selected.id));
-    toast.success('Vendor deleted successfully!');
-    setDeleteOpen(false);
-    setSelected(null);
+  const handleSave = async (data) => {
+    const isEdit = !!selected;
+    try {
+      let result;
+      const todayStr = formatDate(new Date());
+      const payload = {
+        "Vendor Name": data.vendorName,
+        "GST Number": data.gstNumber,
+        "Email Address": data.email,
+        "Phone Number": data.phoneNumber,
+        "Responsibility": data.responsibility,
+        "Contact Person Name": data.contactPerson,
+        "Vendor Location": data.vendorLocation,
+        "Status": data.status,
+        "Created Date": isEdit ? (selected.createdDate || todayStr) : todayStr,
+        "Updated Date": todayStr,
+      };
+
+      if (isEdit) {
+        await updateRow('vendors', selected._row, payload);
+        result = { success: true };
+      } else {
+        const rowValues = [
+          payload["Vendor Name"],
+          payload["GST Number"],
+          payload["Email Address"],
+          payload["Phone Number"],
+          payload["Responsibility"],
+          payload["Contact Person Name"],
+          payload["Vendor Location"],
+          payload["Status"],
+          payload["Created Date"],
+          payload["Updated Date"]
+        ];
+        result = await gasApi.insertInColumns("Master Data", 26, rowValues, 2);
+      }
+
+      if (result.success) {
+        toast.success(isEdit ? 'Vendor updated!' : 'Vendor created!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to save vendor.");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const result = await gasApi.deleteRowInColumns("Master Data", selected._row, 26, 10);
+      if (result.success) {
+        toast.success('Vendor deleted successfully!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete vendor.");
+    } finally {
+      setDeleteOpen(false);
+      setSelected(null);
+    }
   };
 
   return (
@@ -339,6 +388,7 @@ export default function VendorMasterPage() {
           open={formOpen}
           onClose={() => { setFormOpen(false); setSelected(null); }}
           editItem={selected}
+          onSave={handleSave}
         />
       )}
       <ViewDialog open={viewOpen} onClose={() => { setViewOpen(false); setSelected(null); }} item={selected} />

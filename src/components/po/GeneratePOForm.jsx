@@ -8,9 +8,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import PrintIcon from '@mui/icons-material/Print';
 import SaveIcon from '@mui/icons-material/Save';
 import { toast } from 'react-toastify';
-import { updateRecord, completeStage } from '../../store/slices/workflowSlice';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
+import { formatCurrency, formatDate, formatTimestamp } from '../../utils/formatters';
 import aceLogo from '../../assets/ace-logo.png';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const generatePONumber = () => `ACE/PO/25-26-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
@@ -22,18 +25,26 @@ const TransparentInput = ({ readOnly, ...props }) => (
     InputProps={{
       disableUnderline: true,
       readOnly: readOnly || false,
-      style: { fontSize: '0.7rem', fontWeight: 600, padding: 0, cursor: readOnly ? 'default' : 'text' }
+      style: { fontSize: '0.7rem', fontWeight: 600, padding: 0, cursor: readOnly ? 'default' : 'text', color: '#000' }
     }}
-    sx={{ '& .MuiInputBase-input': { padding: 0, height: 'auto' } }}
+    sx={{ 
+      '& .MuiInputBase-input': { 
+        padding: 0, 
+        height: 'auto',
+        color: '#000 !important',
+        WebkitTextFillColor: '#000 !important'
+      } 
+    }}
     {...props}
   />
 );
 
-export default function GeneratePOForm({ open, onClose, viewRecord }) {
-  const dispatch   = useDispatch();
+export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowIds = [] }) {
+   const dispatch   = useDispatch();
   const vendors    = useSelector((state) => state.vendorMaster.items) || [];
   const companies  = useSelector((state) => state.companies.items)    || [];
   const allRecords = useSelector((state) => state.workflow.records)   || [];
+  const { refresh, updateRow, poHistoryRecords = [] } = useData();
 
   const { control, register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
@@ -59,33 +70,80 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
     }
   });
 
-  const { replace } = useFieldArray({ control, name: 'items' });
   const isViewMode  = !!viewRecord;
+
+  // Auto-select supplier if selectedRowIds are passed from parent
+  useEffect(() => {
+    if (isViewMode) return;
+    if (selectedRowIds && selectedRowIds.length > 0 && vendors.length > 0 && poHistoryRecords.length > 0) {
+      const firstRec = poHistoryRecords.find(r => r.id === selectedRowIds[0]);
+      if (firstRec) {
+        const ven = vendors.find(v => v.vendorName === firstRec.partyName);
+        if (ven) {
+          setValue('supplierId', ven.id);
+        }
+      }
+    }
+  }, [selectedRowIds, vendors, poHistoryRecords, isViewMode, setValue]);
+
+  const { replace } = useFieldArray({ control, name: 'items' });
 
   // Only show vendors that have at least one pending purchaseOrder indent
   const pendingPartyNames = useMemo(() => {
     const names = new Set(
-      allRecords
-        .filter(r => r.workflowStage?.purchaseOrder === 'Pending')
+      poHistoryRecords
+        .filter(r => !r.actual)
         .map(r => r.partyName)
     );
     return names;
-  }, [allRecords]);
+  }, [poHistoryRecords]);
 
   const availableVendors = useMemo(
     () => vendors.filter(v => pendingPartyNames.has(v.vendorName)),
     [vendors, pendingPartyNames]
   );
 
-  // ── View mode: pre-fill from frozen poDetails ──────────────────────────
+  // ── View mode: pre-fill from dynamic poHistoryRecords ──────────────────
   useEffect(() => {
     if (!isViewMode || !viewRecord) return;
 
-    if (viewRecord.poDetails) {
-      Object.keys(viewRecord.poDetails).forEach(key => {
-        if (key === 'items') replace(viewRecord.poDetails.items || []);
-        else                 setValue(key, viewRecord.poDetails[key]);
-      });
+    if (viewRecord.poNumber) {
+      // Find all rows in poHistoryRecords that belong to this PO
+      const poGroup = poHistoryRecords.filter(r => r.poNumber && r.poNumber.toLowerCase() === viewRecord.poNumber.toLowerCase());
+      
+      setValue('poNumber',  viewRecord.poNumber || '');
+      setValue('poDate',    viewRecord.timestamp ? new Date(viewRecord.timestamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+      setValue('vendorName', viewRecord.partyName || '');
+      setValue('companyName', viewRecord.companyName || '');
+
+      const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
+      if (ven) {
+        setValue('supplierId',   ven.id);
+        setValue('vendorGst',    ven.gstNumber      || '');
+        setValue('vendorAddress', ven.vendorLocation || 'Not available');
+      }
+
+      const comp = companies.find(c => c.companyName === viewRecord.companyName);
+      if (comp) {
+        setValue('companyId',          comp.id);
+        setValue('companyGst',         comp.gstNumber      || '');
+        setValue('companyPan',         comp.panNumber      || '');
+        setValue('billingAddress',     comp.billingAddress || '');
+        setValue('destinationAddress', comp.destination    || '');
+      }
+
+      replace(poGroup.map((item, idx) => ({
+        sno:          idx + 1,
+        indentNumber: item.indentNumber || '',
+        itemCode:     item.itemCode     || '',
+        groupName:    item.groupName    || '',
+        description:  item.itemName     || '',
+        quantity:     item.quantity     || 0,
+        unit:         item.unit         || '',
+        rate:         item.rate         || 0,
+        discount:     item.discount     || 0,
+        gst:          item.gst          || 0,
+      })));
     } else {
       // Fallback for older records without poDetails
       setValue('poNumber',  viewRecord.poNumber || '');
@@ -122,7 +180,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
         gst:          viewRecord.gst          || 0,
       }]);
     }
-  }, [isViewMode, viewRecord, setValue, replace, vendors, companies]);
+  }, [isViewMode, viewRecord, setValue, replace, vendors, companies, poHistoryRecords]);
 
   // ── Auto-batch pending indents when supplier is selected (edit mode) ───
   const selectedSupplierId = watch('supplierId');
@@ -137,9 +195,11 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
     setValue('vendorGst',     ven.gstNumber      || '');
     setValue('vendorAddress', ven.vendorLocation || 'Not available');
 
-    // Batch ALL pending indents for this supplier
-    const matchedIndents = allRecords.filter(
-      r => r.partyName === ven.vendorName && r.workflowStage?.purchaseOrder === 'Pending'
+    // Batch pending indents for this supplier (filter by selectedRowIds if provided)
+    const matchedIndents = poHistoryRecords.filter(
+      r => r.partyName === ven.vendorName &&
+           !r.actual &&
+           (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
     if (matchedIndents.length === 0) {
@@ -174,7 +234,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
       discount:     ind.discount     || 0,
       gst:          ind.gst          || 0,
     })));
-  }, [selectedSupplierId, vendors, allRecords, companies, setValue, replace, isViewMode]);
+  }, [selectedSupplierId, vendors, poHistoryRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
 
   // ── Running totals ────────────────────────────────────────────────────
   const watchItems = useWatch({ control, name: 'items' });
@@ -199,30 +259,109 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
   const emptyRows      = Array.from({ length: emptyRowsCount });
 
   // ── Save & Submit ─────────────────────────────────────────────────────
-  const onSubmit = () => {
+  const onSubmit = async () => {
     if (isViewMode) return;
 
     const data = watch();
     if (!data.supplierId) { toast.error('Please select a supplier first.'); return; }
 
-    const matchedIndents = allRecords.filter(
-      r => r.partyName === data.vendorName && r.workflowStage?.purchaseOrder === 'Pending'
+    const matchedIndents = poHistoryRecords.filter(
+      r => r.partyName === data.vendorName &&
+           !r.actual &&
+           (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
     if (matchedIndents.length === 0) { toast.error('No pending indents to process.'); return; }
 
-    matchedIndents.forEach(indent => {
-      dispatch(updateRecord({
-        id:        indent.id,
-        poNumber:  data.poNumber,
-        poDate:    data.poDate,
-        poDetails: data,            // full frozen snapshot
-      }));
-      dispatch(completeStage({ id: indent.id, currentStage: 'purchaseOrder' }));
-    });
+    try {
+      toast.info("Generating PO PDF...");
+      const element = document.getElementById("printable-po-content");
+      if (!element) {
+        throw new Error("Printable PO content element not found in DOM");
+      }
 
-    toast.success(`Purchase Order ${data.poNumber} generated! ${matchedIndents.length} item(s) moved to Approval.`);
-    onClose();
+      // Capture element to canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Proportional dimensions matching the container aspect ratio
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      const pdfBase64 = pdf.output('datauristring');
+
+      toast.info("Uploading PDF to Google Drive...");
+      const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+      const uploadResponse = await gasApi.uploadFile({
+        base64Data: pdfBase64,
+        fileName: `${data.poNumber}.pdf`,
+        mimeType: 'application/pdf',
+        folderId
+      });
+
+      if (!uploadResponse || !uploadResponse.success || !uploadResponse.fileUrl) {
+        throw new Error(uploadResponse?.error || "Failed to upload PO to Google Drive");
+      }
+
+      const fileUrl = uploadResponse.fileUrl;
+
+      // Loop sequentially to update both sheets
+      for (const indent of matchedIndents) {
+        const matchedFormItem = data.items?.find(
+          it => it.indentNumber === indent.indentNumber && 
+                it.itemCode === indent.itemCode
+        );
+        const poQty = matchedFormItem ? parseFloat(matchedFormItem.quantity) : indent.quantity;
+        const poRate = matchedFormItem ? parseFloat(matchedFormItem.rate) : indent.rate;
+        const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
+        const poGst = matchedFormItem ? parseFloat(matchedFormItem.gst) : indent.gst;
+        
+        const baseAmount = poQty * poRate;
+        const discounted = baseAmount - poDiscount;
+        const total = discounted * (1 + poGst / 100);
+
+        // 1. Update the row in PO-History sheet
+        await updateRow('poHistory', indent._row, {
+          "Actual": new Date().toISOString().slice(0, 10),
+          "Po Number": data.poNumber,
+          "Rate": poRate,
+          "Discount%": poDiscount,
+          "Gst %": poGst,
+          "Amount": discounted,
+          "Total Amount": total,
+          "PO Copy": fileUrl
+        });
+
+        // 2. Also update the corresponding indent row in INDENT-PO sheet for downstream workflow
+        const matchingIndent = allRecords.find(
+          r => r.indentNumber === indent.indentNumber && 
+               r.serialNo === indent.serialNo
+        );
+        if (matchingIndent) {
+          await updateRow('indents', matchingIndent.id, {
+            "Po No.": data.poNumber,
+            "PO Qty": poQty,
+            "Rate 1 ": poRate,
+            "Rate 1": poRate,
+            "PO Copy": fileUrl
+          });
+        }
+      }
+
+      toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
+      onClose();
+      await refresh();
+    } catch (err) {
+      console.error("Failed to generate PO:", err);
+      toast.error(err.message || "Failed to write PO details to spreadsheet.");
+    }
   };
 
   return (
@@ -255,11 +394,27 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
 
       {/* ── Printable PO Template ──────────────────────────────────────── */}
       <DialogContent sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fff', '@media print': { p: 0 } }}>
-        <Box sx={{
-          maxWidth: '900px', mx: 'auto', border: '2px solid #000',
-          fontFamily: '"Arial", sans-serif', color: '#000',
-          '& *': { borderColor: '#000 !important' }
-        }}>
+        <Box 
+          id="printable-po-content"
+          sx={{
+            maxWidth: '900px', mx: 'auto', border: '2px solid #000',
+            fontFamily: '"Arial", sans-serif', color: '#000',
+            '& .MuiTypography-root:not(.white-text)': {
+              color: '#000 !important'
+            },
+            '& .MuiInputBase-input, & .MuiSelect-select': {
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important'
+            },
+            '& td': {
+              color: '#000 !important'
+            },
+            '& p': {
+              color: '#000 !important'
+            },
+            '& *': { borderColor: '#000 !important' }
+          }}
+        >
 
           {/* 1. Header */}
           <Box sx={{ display: 'flex', borderBottom: '2px solid #000' }}>
@@ -268,7 +423,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
             </Box>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ bgcolor: '#4A90E2', color: '#fff', py: 1.5, textAlign: 'center' }}>
-                <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: 1 }}>{data.companyName}</Typography>
+                <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: 1 }} className="white-text">{data.companyName}</Typography>
               </Box>
               <Box sx={{ textAlign: 'center', py: 0.5, borderBottom: '1px solid #000' }}>
                 <Typography variant="body2" fontWeight={600}>Changurabhata, Raipur, Chhattisgarh</Typography>
@@ -299,6 +454,14 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
                         {availableVendors.length === 0 ? 'No pending indents' : 'Select Supplier...'}
                       </MenuItem>
                       {availableVendors.map(v => <MenuItem key={v.id} value={v.id}>{v.vendorName}</MenuItem>)}
+                      {field.value && !availableVendors.some(v => v.id === field.value) && (
+                        (() => {
+                          const currentVen = vendors.find(v => v.id === field.value);
+                          return currentVen ? (
+                            <MenuItem key={currentVen.id} value={currentVen.id}>{currentVen.vendorName}</MenuItem>
+                          ) : null;
+                        })()
+                      )}
                     </TextField>
                   )} />
                 )}
@@ -327,7 +490,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
           {/* 3. Commercial Details */}
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '2px solid #000' }}>
             <Box sx={{ textAlign: 'center', borderRight: '1px solid #000' }}>
-              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }}>Our Commercial Details</Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Our Commercial Details</Typography>
               <Box sx={{ display: 'flex', borderBottom: '1px solid #000' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px', borderRight: '1px solid #000', p: 0.5 }}>GSTIN</Typography>
                 <Box sx={{ flex: 1, p: 0.5 }}><TransparentInput {...register('companyGst')} readOnly={isViewMode} /></Box>
@@ -338,12 +501,12 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
               </Box>
             </Box>
             <Box sx={{ textAlign: 'center', borderRight: '1px solid #000', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }}>Billing Address</Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Billing Address</Typography>
               <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
               <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('billingAddress')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></Box>
             </Box>
             <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }}>Destination Address</Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Destination Address</Typography>
               <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
               <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('destinationAddress')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></Box>
             </Box>
@@ -416,7 +579,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
 
           {/* 5. Terms */}
           <Box sx={{ borderTop: '2px solid #000' }}>
-            <Typography variant="caption" sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', px: 1, py: 0.25, fontWeight: 700, textTransform: 'uppercase' }}>Terms &amp; Conditions</Typography>
+            <Typography variant="caption" sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', px: 1, py: 0.25, fontWeight: 700, textTransform: 'uppercase' }} className="white-text">Terms &amp; Conditions</Typography>
             <Box sx={{ p: 1, display: 'grid', gridTemplateColumns: '15px 85px 1fr', gap: 0.5, alignItems: 'center', '& p': { m: 0, fontSize: '0.65rem', fontWeight: 600 } }}>
               <p>1</p><p>Price Basis :</p><TransparentInput {...register('priceBasis')} readOnly={isViewMode} />
               <p>2</p><p>Taxes &amp; Duties :</p><TransparentInput {...register('taxesDuties')} readOnly={isViewMode} />
@@ -432,9 +595,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord }) {
 
           {/* 6. Signatures */}
           <Box sx={{ display: 'flex', bgcolor: '#4A90E2', color: '#fff', '& div': { flex: 1, py: 0.5, px: 2, fontSize: '0.65rem', fontWeight: 700 } }}>
-            <Box textAlign="left">Prepared By</Box>
-            <Box textAlign="center">Purchase Head</Box>
-            <Box textAlign="right" />
+            <Box className="white-text" sx={{ textAlign: 'left' }}>Prepared By</Box>
+            <Box className="white-text" sx={{ textAlign: 'center' }}>Purchase Head</Box>
+            <Box className="white-text" sx={{ textAlign: 'right' }} />
           </Box>
 
         </Box>

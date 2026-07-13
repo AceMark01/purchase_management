@@ -1,0 +1,548 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { Backdrop, CircularProgress, Box, Typography, Card, Button } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { gasApi } from '../services/gasApi';
+import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVendorRow, mapUserRow, mapSettingsRow } from '../services/dataMapper';
+import { setRecords } from '../store/slices/workflowSlice';
+import { setVendors } from '../store/slices/vendorSlice';
+import { setCompanies } from '../store/slices/companySlice';
+import { formatTimestamp } from '../utils/formatters';
+
+const DataContext = createContext(null);
+
+// Static mapping for vendor metadata based on original mock data
+const VENDOR_METADATA_MAP = {
+  'Vidadri Paper Raipur': { id: 1, gstNumber: '22AAAAA0000A1Z5', email: 'info@vidadri.com', phoneNumber: '9876543210', contactPerson: 'Vidadri Manager', vendorLocation: 'Raipur, Chhattisgarh' },
+  'Raj Suppliers':        { id: 2, gstNumber: 'GST27RAJSU1234F1Z5', email: 'raj@suppliers.com', phoneNumber: '9876543210', contactPerson: 'Rajesh Kumar', vendorLocation: 'Mumbai, Maharashtra' },
+  'Sharma Traders':       { id: 3, gstNumber: '22SHART0001B1Z9', email: '', phoneNumber: '', contactPerson: 'Vikram Sharma', vendorLocation: 'Delhi, NCR' },
+  'Patel Enterprises':    { id: 4, gstNumber: 'GST29PATEL9012Q3Z7', email: 'patel@enterprises.com', phoneNumber: '9876543212', contactPerson: 'Suresh Patel', vendorLocation: 'Ahmedabad, Gujarat' },
+  'CleanPaper Co.':       { id: 5, gstNumber: '22CLEAN0000C1Z3', email: 'clean@paper.com', phoneNumber: '9876543210', contactPerson: 'Manager', vendorLocation: 'Raipur, Chhattisgarh' },
+  'NK':                   { id: 6, gstNumber: '22NKMAN0000N1Z1', email: 'nk@tape.com', phoneNumber: '9876543211', contactPerson: 'NK Manager', vendorLocation: 'Raipur, Chhattisgarh' },
+  'Acemark Publications': { id: 7, gstNumber: '22ACEPU0000A1Z5', email: 'acemark@pub.com', phoneNumber: '9000000000', contactPerson: 'Manager', vendorLocation: 'Raipur, Chhattisgarh' },
+  'Singh Steel Works':    { id: 9, gstNumber: 'GST03SINGH4567L1X3', email: 'singh@steelworks.com', phoneNumber: '9876543213', contactPerson: 'Gurpreet Singh', vendorLocation: 'Ludhiana, Punjab' },
+};
+
+// Static companies metadata
+const STATIC_COMPANIES = [
+  {
+    id: 1,
+    companyName: 'Acemark Stationers',
+    gstNumber: '22ABLFA7973J1Z2',
+    panNumber: 'ABLFA7973J',
+    email: 'info@acemark.com',
+    phoneNumber: '9876543210',
+    responsibleDepartment: 'Procurement',
+    responsiblePerson: 'Rajesh Kumar',
+    companyAddress: 'Infront Of Csidc Office, Mahadev Ghat Road Changurabhata, Raipur - 492013, Chhattisgarh, India',
+    billingAddress: 'Infront Of Csidc Office, Mahadev Ghat Road Changurabhata, Raipur - 492013, Chhattisgarh, India',
+    destination: 'Infront Of Csidc Office, Mahadev Ghat Road Changurabhata, Raipur - 492013, Chhattisgarh, India',
+    status: 'Active',
+  },
+  {
+    id: 2,
+    companyName: 'Alpha Industries Ltd',
+    gstNumber: 'GST09FGHIJ5678K2Y6',
+    panNumber: 'FGHIJ5678K',
+    email: 'contact@betamfg.com',
+    phoneNumber: '9876543211',
+    responsibleDepartment: 'Operations',
+    responsiblePerson: 'Vikram Sharma',
+    companyAddress: '45, MIDC Estate, Pune - 411018',
+    billingAddress: '45, MIDC Estate, Pune - 411018',
+    destination: 'Pune',
+    status: 'Active',
+  },
+  {
+    id: 3,
+    companyName: 'Gamma Enterprises',
+    gstNumber: 'GST29LMNOP9012Q3Z7',
+    panNumber: 'LMNOP9012Q',
+    email: 'hello@gammaent.com',
+    phoneNumber: '9876543212',
+    responsibleDepartment: 'Finance',
+    responsiblePerson: 'Suresh Patel',
+    companyAddress: 'Sector 5, Electronic City, Bangalore - 560100',
+    billingAddress: 'Sector 5, Electronic City, Bangalore - 560100',
+    destination: 'Bangalore',
+    status: 'Inactive',
+  },
+];
+
+const SHEET_MAP = {
+  "indents": "INDENT-PO",
+  "indentForm": "indent Data",
+  "approvals": "Audit/Approval",
+  "followUps": "Flw-up",
+  "logistics": "LIFT-RECEIVED",
+  "receiving": "RECEIVED-ACCOUNTS",
+  "products": "Master Data",
+  "companies": "Master Data",
+  "vendors": "Master Data",
+  "masterData": "Master Data",
+  "users": "Administration",
+  "whatsapp": "Whatsapp Form",
+  "poSentStatus": "PO Sent Status",
+  "poGenerate": "Po Generate",
+  "poHistory": "PO-History"
+};
+
+const getHeaderRow = (grid) => {
+  if (!grid || grid.length === 0) return [];
+  for (let i = 0; i < Math.min(grid.length, 10); i++) {
+    const row = grid[i];
+    if (Array.isArray(row) && row.some(cell => {
+      const s = String(cell || "").trim().toLowerCase();
+      return s === "timestamp" || s === "indent number" || s === "request id" || s === "lift no." || s === "product type" || s === "lift no" || s === "po number" || s === "party name" || s === "ln-lift number" || s === "transporter name" || s === "bill no." || s === "lift status";
+    })) {
+      return row.map(h => String(h || "").trim());
+    }
+  }
+  return grid[0] || [];
+};
+
+const raw2DArrayToObjects = (grid) => {
+  if (!grid || grid.length === 0) return [];
+  
+  // Find header row dynamically within the first 10 rows
+  let headerRowIndex = 0;
+  for (let i = 0; i < Math.min(grid.length, 10); i++) {
+    const row = grid[i];
+    if (Array.isArray(row) && row.some(cell => {
+      const s = String(cell || "").trim().toLowerCase();
+      return s === "timestamp" || s === "indent number" || s === "request id" || s === "lift no." || s === "product type" || s === "lift no" || s === "ln-lift number" || s === "transporter name" || s === "bill no." || s === "lift status";
+    })) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  const headers = (grid[headerRowIndex] || []).map(h => String(h || "").trim());
+  const objects = [];
+  for (let i = headerRowIndex + 1; i < grid.length; i++) {
+    const row = grid[i];
+    if (!row || row.every(cell => cell === "" || cell === null || cell === undefined)) {
+      continue;
+    }
+    // _row is the physical 1-based row index in spreadsheet (i + 1)
+    const obj = { _row: i + 1 };
+    for (let j = 0; j < headers.length; j++) {
+      const header = headers[j];
+      if (header) {
+        obj[header] = row[j];
+      }
+    }
+    objects.push(obj);
+  }
+  return objects;
+};
+
+export function DataProvider({ children }) {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(true);
+  const [writeLoading, setWriteLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Local states for loaded resources
+  const [recordsState, setRecordsState] = useState([]);
+  const [productsState, setProductsState] = useState([]);
+  const [vendorsState, setVendorsState] = useState([]);
+  const [companiesState, setCompaniesState] = useState([]);
+  const [whatsappEntries, setWhatsappEntries] = useState([]);
+  const [usersState, setUsersState] = useState([]);
+  const [settingsState, setSettingsState] = useState([]);
+  const [rawReceiving, setRawReceiving] = useState([]);
+  const [rawLogistics, setRawLogistics] = useState([]);
+  const [headersState, setHeadersState] = useState({});
+  const [poHistoryRecords, setPoHistoryRecords] = useState([]);
+
+  const loadData = async (showGlobalLoading = true) => {
+    if (showGlobalLoading) setLoading(true);
+    setError(null);
+    try {
+      // Call Apps Script bootstrap endpoint
+      const result = await gasApi.bootstrap();
+      
+      const {
+        indents: indentsRaw = [],
+        approvals: approvalsRaw = [],
+        followUps: followUpsRaw = [],
+        logistics: logisticsRaw = [],
+        receiving: receivingRaw = [],
+        masterData: masterDataRaw = [],
+        users: usersRaw = [],
+        whatsapp: whatsappRaw = [],
+        poSentStatus: poSentStatusRaw = [],
+        poGenerate: poGenerateRaw = [],
+        poHistory: poHistoryRaw = []
+      } = result.data || {};
+
+      const headersMap = {
+        indents: getHeaderRow(indentsRaw),
+        approvals: getHeaderRow(approvalsRaw),
+        followUps: getHeaderRow(followUpsRaw),
+        logistics: getHeaderRow(logisticsRaw),
+        receiving: getHeaderRow(receivingRaw),
+        users: getHeaderRow(usersRaw),
+        whatsapp: getHeaderRow(whatsappRaw),
+        poSentStatus: getHeaderRow(poSentStatusRaw),
+        poGenerate: getHeaderRow(poGenerateRaw),
+        poHistory: getHeaderRow(poHistoryRaw)
+      };
+
+      const sliceRowToObj = (row, headers, startColIdx) => {
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          const header = headers[j];
+          if (header) {
+            obj[header] = row[startColIdx + j];
+          }
+        }
+        return obj;
+      };
+
+      // Products: columns A-I (0-8)
+      const productHeaders = (masterDataRaw[1] || []).slice(0, 9).map(h => String(h || "").trim());
+      const productsObj = masterDataRaw.slice(2).map((row, idx) => ({
+        _row: idx + 3,
+        ...sliceRowToObj(row, productHeaders, 0)
+      })).filter(r => r["Product Type"] && String(r["Product Type"]).trim() !== "");
+      const mappedProducts = productsObj.map((row, idx) => mapProductRow(row, idx));
+
+      // Companies: columns M-Y (12-24)
+      const companyHeaders = (masterDataRaw[1] || []).slice(12, 25).map(h => String(h || "").trim());
+      const companiesObj = masterDataRaw.slice(2).map((row, idx) => ({
+        _row: idx + 3,
+        ...sliceRowToObj(row, companyHeaders, 12)
+      })).filter(r => r["Company Name"] && String(r["Company Name"]).trim() !== "");
+      const mappedCompanies = companiesObj.map((row, idx) => mapCompanyRow(row, idx));
+
+      // Vendors: columns Z-AI (25-34)
+      const vendorHeaders = (masterDataRaw[1] || []).slice(25, 35).map(h => String(h || "").trim());
+      const vendorsObj = masterDataRaw.slice(2).map((row, idx) => ({
+        _row: idx + 3,
+        ...sliceRowToObj(row, vendorHeaders, 25)
+      })).filter(r => r["Vendor Name"] && String(r["Vendor Name"]).trim() !== "");
+      const mappedVendors = vendorsObj.map((row, idx) => mapVendorRow(row, idx));
+
+      // Users: Administration sheet, header row = 2
+      const userHeaders = (usersRaw[1] || []).map(h => String(h || "").trim());
+      const usersObj = usersRaw.slice(2).map((row, idx) => ({
+        _row: idx + 3,
+        ...sliceRowToObj(row, userHeaders, 0)
+      })).filter(r => r["Full Name"] && String(r["Full Name"]).trim() !== "");
+      const mappedUsers = usersObj.map((row, idx) => mapUserRow(row, idx));
+
+      // Settings: Administration sheet, columns H-AB (index 7-27), header row = 2
+      const settingsHeaders = (usersRaw[1] || []).slice(7, 28).map(h => String(h || "").trim());
+      const settingsObj = usersRaw.slice(2).map((row, idx) => ({
+        _row: idx + 3,
+        ...sliceRowToObj(row, settingsHeaders, 7)
+      })).filter(r => r["Role"] && String(r["Role"]).trim() !== "");
+      const mappedSettings = settingsObj.map((row, idx) => mapSettingsRow(row, idx));
+      setSettingsState(mappedSettings);
+
+      const fullHeaders = (masterDataRaw[1] || []).map(h => String(h || "").trim());
+      setHeadersState({
+        ...headersMap,
+        products: productHeaders,
+        companies: companyHeaders,
+        vendors: vendorHeaders,
+        masterData: fullHeaders,
+        users: userHeaders
+      });
+
+      const indents = raw2DArrayToObjects(indentsRaw);
+      const approvals = raw2DArrayToObjects(approvalsRaw);
+      const followUps = raw2DArrayToObjects(followUpsRaw);
+      const logistics = raw2DArrayToObjects(logisticsRaw);
+      const receiving = raw2DArrayToObjects(receivingRaw);
+      const whatsapp = raw2DArrayToObjects(whatsappRaw);
+      const poSentStatus = raw2DArrayToObjects(poSentStatusRaw);
+      const poHistory = raw2DArrayToObjects(poHistoryRaw);
+
+      setRawReceiving(receiving);
+      setRawLogistics(logistics);
+
+      setProductsState(mappedProducts);
+      setVendorsState(mappedVendors);
+      dispatch(setVendors(mappedVendors));
+
+      setCompaniesState(mappedCompanies);
+      dispatch(setCompanies(mappedCompanies));
+
+      setUsersState(mappedUsers);
+
+      // Map workflow records (derived)
+      const mappedRecords = mapWorkflowRecords(
+        indents,
+        approvals,
+        followUps,
+        logistics,
+        receiving,
+        poSentStatus,
+        mappedVendors,
+        mappedCompanies,
+        poHistory
+      );
+      setRecordsState(mappedRecords);
+      dispatch(setRecords(mappedRecords));
+
+      // Map PO-History records for PO page consumption
+      const parseNum = (val) => {
+        if (val === undefined || val === null || val === '') return 0;
+        const num = parseFloat(val);
+        return isNaN(num) ? 0 : num;
+      };
+
+      const mappedPoHistory = poHistory.map((row, idx) => ({
+        id: row._row || (idx + 1),
+        _row: row._row,
+        timestamp: row["Timestamp"] || "",
+        actual: row["Actual"] || "",
+        partyName: row["Party Name"] || "",
+        poNumber: row["Po Number"] || "",
+        productCode: row["Product Code"] || "",
+        product: row["Product"] || "",
+        description: row["Description"] || "",
+        quantity: parseNum(row["Quntity"]),
+        unit: row["Unit"] || "",
+        rate: parseNum(row["Rate"]),
+        discount: parseNum(row["Discount%"]),
+        gst: parseNum(row["Gst %"]),
+        amount: parseNum(row["Amount"]),
+        totalAmount: parseNum(row["Total Amount"]),
+        poCopy: row["PO Copy"] || "",
+        indentNumber: row["Indent No."] || "",
+        serialNo: parseNum(row["Product No."]),
+        companyName: row["Company Name"] || "",
+        
+        // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
+        itemName: row["Product"] || "",
+        itemCode: row["Product Code"] || "",
+        groupName: row["Description"] || "",
+        status: row["Actual"] ? "Completed" : "Pending",
+        createdDate: row["Timestamp"] || "",
+        orderBy: ""
+      }));
+      setPoHistoryRecords(mappedPoHistory);
+
+      // Map WhatsApp entries
+      const mappedWhatsApp = whatsapp.map((row, idx) => mapWhatsAppRow(row, idx));
+      setWhatsappEntries(mappedWhatsApp);
+
+    } catch (err) {
+      console.error("Failed to load data from GAS:", err);
+      setError(err.message || "Failed to connect to Google Sheets backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const refresh = async () => {
+    setWriteLoading(true);
+    try {
+      await loadData(false);
+    } finally {
+      setWriteLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          bgcolor: 'background.default',
+        }}
+      >
+        <CircularProgress size={50} thickness={4.5} />
+        <Typography variant="body1" fontWeight={600} color="text.secondary">
+          Connecting to Google Sheets Database...
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3,
+          bgcolor: 'background.default',
+        }}
+      >
+        <Card
+          sx={{
+            maxWidth: 480,
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 3,
+            boxShadow: 3,
+          }}
+        >
+          <ErrorOutlineIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
+          <Typography variant="h6" fontWeight={700} gutterBottom>
+            Database Connection Failed
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<RefreshIcon />}
+            onClick={() => loadData(true)}
+            sx={{ px: 4, borderRadius: 2 }}
+          >
+            Retry Connection
+          </Button>
+        </Card>
+      </Box>
+    );
+  }
+
+  const updateRow = async (resource, rowIndex, columnValues) => {
+    const sheetName = SHEET_MAP[resource];
+    const headers = headersState[resource] || [];
+    let colOffset = 0;
+    if (resource === "companies") {
+      colOffset = 12;
+    } else if (resource === "vendors") {
+      colOffset = 25;
+    } else if (resource === "products") {
+      colOffset = 0;
+    }
+    
+    setWriteLoading(true);
+    try {
+      for (const [colName, value] of Object.entries(columnValues)) {
+        const colIdx = headers.indexOf(colName) + 1;
+        if (colIdx > 0) {
+          await gasApi.updateCell(sheetName, rowIndex, colIdx + colOffset, value);
+        }
+      }
+    } finally {
+      setWriteLoading(false);
+    }
+  };
+
+  const addRow = async (resource, data) => {
+    const sheetName = SHEET_MAP[resource];
+    const headers = headersState[resource] || [];
+    const rowValues = [];
+    // Skip Column A (headers[0]) because backend.js's insert action automatically prepends uniqueId to Column A.
+    for (let i = 1; i < headers.length; i++) {
+      const header = headers[i];
+      if (header === "Timestamp") {
+        rowValues.push(formatTimestamp(data.Timestamp || data.timestamp || new Date()));
+      } else if (data[header] !== undefined) {
+        rowValues.push(data[header]);
+      } else {
+        rowValues.push("");
+      }
+    }
+    setWriteLoading(true);
+    try {
+      const res = await gasApi.insertRow(sheetName, rowValues);
+      return res;
+    } finally {
+      setWriteLoading(false);
+    }
+  };
+
+  const updateSettingsRow = async (rowIndex, roleData, updatedBy) => {
+    const dataRow = [
+      roleData.role,
+      roleData.pages.includes('dashboard') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('indent') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('purchaseOrder') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('followUp') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('logistics') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('lifting') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('receiveMaterial') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('liftReceiver') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('tallyEntry') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('reports') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('userManagement') ? 'TRUE' : 'FALSE',
+      roleData.pages.includes('settings') ? 'TRUE' : 'FALSE',
+      roleData.actions.create ? 'TRUE' : 'FALSE',
+      roleData.actions.read ? 'TRUE' : 'FALSE',
+      roleData.actions.update ? 'TRUE' : 'FALSE',
+      roleData.actions.delete ? 'TRUE' : 'FALSE',
+      roleData.actions.export ? 'TRUE' : 'FALSE',
+      roleData.actions.print ? 'TRUE' : 'FALSE',
+      formatTimestamp(new Date()),
+      updatedBy,
+    ];
+    setWriteLoading(true);
+    try {
+      let res;
+      if (rowIndex) {
+        res = await gasApi.updateInColumns('Administration', rowIndex, 8, dataRow);
+      } else {
+        res = await gasApi.insertInColumns('Administration', 8, dataRow, 2);
+      }
+      return res;
+    } finally {
+      setWriteLoading(false);
+    }
+  };
+
+  return (
+    <DataContext.Provider
+      value={{
+        records: recordsState,
+        products: productsState,
+        vendors: vendorsState,
+        companies: companiesState,
+        whatsappEntries,
+        users: usersState,
+        settings: settingsState,
+        receiving: rawReceiving,
+        logistics: rawLogistics,
+        headers: headersState,
+        refresh,
+        updateRow,
+        addRow,
+        updateSettingsRow,
+        poHistoryRecords
+      }}
+    >
+      {children}
+      
+      {/* Global backdrop loader for write operations */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 999 }}
+        open={writeLoading}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress color="inherit" size={45} />
+          <Typography variant="body2" fontWeight={600}>
+            Saving to Google Sheets...
+          </Typography>
+        </Box>
+      </Backdrop>
+    </DataContext.Provider>
+  );
+}
+
+export const useData = () => {
+  const ctx = useContext(DataContext);
+  if (!ctx) throw new Error('useData must be used inside DataProvider');
+  return ctx;
+};
+export default DataContext;

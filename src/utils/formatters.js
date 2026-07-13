@@ -4,19 +4,32 @@ export const formatCurrency = (val) =>
 export const formatNumber = (val) =>
   new Intl.NumberFormat('en-IN').format(val || 0);
 
-export const formatDate = (d, withTime = false) => {
+export const formatDate = (d, withTime = true) => {
   if (!d) return '';
+  const str = String(d).trim();
+  // If already matches DD-MM-YYYY HH:mm:ss, return directly
+  if (/^\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}$/.test(str)) {
+    return str;
+  }
+  // If matches DD-MM-YYYY without time, append time if requested
+  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+    return withTime ? `${str} 00:00:00` : str;
+  }
   try {
     const date = new Date(d);
+    if (isNaN(date.getTime())) return str;
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    
     if (withTime) {
-      return date.toLocaleString('en-IN', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false,
-      }).replace(',', '');
+      return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
     }
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch { return String(d); }
+    return `${dd}-${mm}-${yyyy}`;
+  } catch { return str; }
 };
 
 export const generateNumber = (prefix, items, key) => {
@@ -44,6 +57,24 @@ export const generateIndentNumber = (records, partyName) => {
   return `RI ${String(next).padStart(2, '0')}`;
 };
 
+export const generateLiftNumber = (receivingRows) => {
+  const max = (receivingRows || []).reduce((m, row) => {
+    const match = (row["Lift No."] || row["Lift No"] || "").match(/LN\s*-?\s*(\d+)/i);
+    if (!match) return m;
+    return Math.max(m, parseInt(match[1], 10));
+  }, 0);
+  return `LN-${max + 1}`;
+};
+
+export const generateLogisticsLiftNumber = (logisticsRows) => {
+  const max = (logisticsRows || []).reduce((m, row) => {
+    const match = (row["LN-Lift Number"] || row["LN-Lift Number "] || "").match(/LN\s*-?\s*(\d+)/i);
+    if (!match) return m;
+    return Math.max(m, parseInt(match[1], 10));
+  }, 0);
+  return `LN-${max + 1}`;
+};
+
 export const statusColor = (status) => {
   const map = {
     'Pending': 'warning', 'Approved': 'success', 'Rejected': 'error',
@@ -56,4 +87,16 @@ export const statusColor = (status) => {
     'active': 'success', 'inactive': 'error',
   };
   return map[status] || 'default';
+};
+
+export const formatTimestamp = (d = new Date()) => {
+  const date = new Date(d);
+  const pad = (num) => String(num).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
 };

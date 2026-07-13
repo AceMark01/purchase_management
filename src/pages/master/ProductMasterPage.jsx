@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import {
   Box, Button, Typography, Chip, Dialog, DialogTitle, DialogContent,
   DialogActions, Grid, TextField, MenuItem, Divider, IconButton, Tooltip,
@@ -10,7 +11,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import DataTable  from '../../components/common/DataTable';
-import { PRODUCTS as INITIAL_PRODUCTS, VENDORS } from '../../data/mockData';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import { formatCurrency } from '../../utils/formatters';
 
 const PRODUCT_TYPES = ['Raw Material', 'Consumables', 'Capital Equipment', 'Office Supply', 'IT Equipment'];
@@ -28,16 +30,28 @@ const COLUMNS = [
 ];
 
 function ProductForm({ open, onClose, editItem, onSave }) {
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
-    defaultValues: editItem || {
+  const vendors = useSelector(state => state.vendorMaster.items) || [];
+  
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
+    defaultValues: {
       type: '', supplierId: '', supplierName: '', groupName: '',
       itemName: '', unit: '', itemCode: '', purchaseRate: '', whatsapp: '',
     },
   });
 
+  useEffect(() => {
+    if (editItem) {
+      reset(editItem);
+    } else {
+      reset({
+        type: '', supplierId: '', supplierName: '', groupName: '',
+        itemName: '', unit: '', itemCode: '', purchaseRate: '', whatsapp: '',
+      });
+    }
+  }, [editItem, open, reset]);
+
   const onSubmit = data => {
     onSave({ ...data, id: editItem?.id || Date.now(), purchaseRate: parseFloat(data.purchaseRate) || 0 });
-    toast.success(editItem ? 'Product updated!' : 'Product added!');
     onClose();
     reset();
   };
@@ -69,8 +83,25 @@ function ProductForm({ open, onClose, editItem, onSave }) {
             <Grid item xs={12} sm={6}>{field('supplierId', 'Supplier ID')}</Grid>
             <Grid item xs={12} sm={6}>
               <Controller name="supplierName" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Supplier Name" error={!!errors.supplierName} helperText={errors.supplierName?.message} sx={INPUT_SX}>
-                  {VENDORS.map(v => <MenuItem key={v.id} value={v.name}>{v.name}</MenuItem>)}
+                <TextField 
+                  {...f} 
+                  select 
+                  fullWidth 
+                  size="small" 
+                  label="Supplier Name" 
+                  error={!!errors.supplierName} 
+                  helperText={errors.supplierName?.message} 
+                  sx={INPUT_SX}
+                  onChange={(e) => {
+                    f.onChange(e.target.value);
+                    const selectedVen = vendors.find(v => v.vendorName === e.target.value);
+                    if (selectedVen) {
+                      setValue('supplierId', String(selectedVen.id || ''));
+                      setValue('whatsapp', selectedVen.phoneNumber || '');
+                    }
+                  }}
+                >
+                  {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                 </TextField>
               )} />
             </Grid>
@@ -93,21 +124,65 @@ function ProductForm({ open, onClose, editItem, onSave }) {
 }
 
 export default function ProductMasterPage() {
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const { products, refresh, updateRow } = useData();
   const [formOpen, setFormOpen]  = useState(false);
   const [editItem, setEditItem]  = useState(null);
 
-  const handleSave = item => {
-    setProducts(prev =>
-      prev.some(p => p.id === item.id)
-        ? prev.map(p => p.id === item.id ? item : p)
-        : [...prev, item]
-    );
+  const handleSave = async item => {
+    const existing = products.find(p => p.itemCode === item.itemCode);
+    const isEdit = !!existing;
+    try {
+      let result;
+      const payload = {
+        "Product Type": item.type,
+        "Supplier ID": item.supplierId,
+        "Supplier Name": item.supplierName,
+        "Group Name": item.groupName,
+        "Item Name": item.itemName,
+        "Unit": item.unit,
+        "Item Code": item.itemCode,
+        "Purchase Rate": Number(item.purchaseRate) || 0,
+        "Party Whatsapp No.": item.whatsapp || "",
+      };
+      if (isEdit) {
+        await updateRow('products', existing._row, payload);
+        result = { success: true };
+      } else {
+        const rowData = [
+          payload["Product Type"],
+          payload["Supplier ID"],
+          payload["Supplier Name"],
+          payload["Group Name"],
+          payload["Item Name"],
+          payload["Unit"],
+          payload["Item Code"],
+          payload["Purchase Rate"],
+          payload["Party Whatsapp No."]
+        ];
+        result = await gasApi.insertInColumns("Master Data", 1, rowData, 2);
+      }
+      if (result.success) {
+        toast.success(isEdit ? 'Product updated!' : 'Product added!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to save product.");
+    }
   };
 
-  const handleDelete = row => {
-    setProducts(prev => prev.filter(p => p.id !== row.id));
-    toast.success('Product deleted.');
+  const handleDelete = async row => {
+    if (!window.confirm(`Are you sure you want to delete product "${row.itemName}"?`)) return;
+    try {
+      const result = await gasApi.deleteRowInColumns("Master Data", row._row, 1, 9);
+      if (result.success) {
+        toast.success('Product deleted.');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete product.");
+    }
   };
 
   const actions = row => (

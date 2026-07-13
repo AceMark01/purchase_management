@@ -6,23 +6,25 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Paper, IconButton, Divider, alpha, useTheme, Chip, InputAdornment, Tooltip,
   TablePagination, Dialog, DialogTitle, DialogContent, DialogActions,
+  CircularProgress, Stack,
 } from '@mui/material';
-import DeleteIcon        from '@mui/icons-material/Delete';
-import CloudUploadIcon   from '@mui/icons-material/CloudUpload';
-import RocketLaunchIcon  from '@mui/icons-material/RocketLaunch';
-import AssignmentIcon    from '@mui/icons-material/Assignment';
-import AddIcon         from '@mui/icons-material/Add';
-import WhatsAppIcon      from '@mui/icons-material/WhatsApp';
-import SearchIcon        from '@mui/icons-material/Search';
-import FileDownloadIcon  from '@mui/icons-material/FileDownload';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AddIcon from '@mui/icons-material/Add';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import SearchIcon from '@mui/icons-material/Search';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { toast } from 'react-toastify';
-import { addRecord } from '../../store/slices/workflowSlice';
-import { formatDate, generateIndentNumber } from '../../utils/formatters';
-import { COMPANIES, VENDORS, PRODUCTS } from '../../data/mockData';
+import { formatDate, generateIndentNumber, formatTimestamp } from '../../utils/formatters';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import { exportToExcel } from '../../utils/exportUtils';
 
 /* ─── constants ───────────────────────────────────── */
 const ORDER_BY_LIST = [
+
   'Admin User', 'John Smith', 'Sarah Johnson', 'Emma Davis',
   'Mike Wilson', 'Mr. Sharma', 'Amlan Dikshit',
 ];
@@ -49,23 +51,23 @@ function NumInput({ regProps, defaultValue }) {
 
 /* ─── Indent List Table ────────────────────────────── */
 const LIST_COLS = [
-  { key: 'createdDate',  label: 'Timestamp',       render: v => formatDate(v, true) },
-  { key: 'indentNumber', label: 'Indent Number',   render: v => <Chip label={v} size="small" color="primary" sx={{ fontWeight: 700, fontSize: '0.7rem', height: 22 }} /> },
-  { key: 'serialNo',     label: 'Serial No.' },
-  { key: 'orderBy',      label: 'Order By' },
-  { key: 'partyName',    label: 'Party Name',       render: v => <Typography variant="body2" fontWeight={600}>{v}</Typography> },
-  { key: 'groupName',    label: 'Group Name' },
-  { key: 'itemName',     label: 'Item Name',         render: v => <Typography variant="body2" sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Typography> },
-  { key: 'itemCode',     label: 'Item Code' },
-  { key: 'description',  label: 'Description' },
-  { key: 'quantity',     label: 'Quantity' },
-  { key: 'unit',         label: 'Unit' },
-  { key: 'rate',         label: 'Rate' },
-  { key: 'gst',          label: 'GST %' },
-  { key: 'discount',     label: 'Discount Amount' },
-  { key: 'image',        label: 'Image',            render: v => v ? <a href={v} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontSize: '0.78rem' }}>View Link</a> : '—' },
-  { key: 'leadDays',     label: 'Approx Lead Days' },
-  { key: 'companyName',  label: 'Company Name' },
+  { key: 'createdDate', label: 'Timestamp', render: v => formatDate(v, true) },
+  { key: 'indentNumber', label: 'Indent Number', render: v => <Chip label={v} size="small" color="primary" sx={{ fontWeight: 700, fontSize: '0.7rem', height: 22 }} /> },
+  { key: 'serialNo', label: 'Serial No.' },
+  { key: 'orderBy', label: 'Order By' },
+  { key: 'partyName', label: 'Party Name', render: v => <Typography variant="body2" fontWeight={600}>{v}</Typography> },
+  { key: 'groupName', label: 'Group Name' },
+  { key: 'itemName', label: 'Item Name', render: v => <Typography variant="body2" sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Typography> },
+  { key: 'itemCode', label: 'Item Code' },
+  { key: 'description', label: 'Description' },
+  { key: 'quantity', label: 'Quantity' },
+  { key: 'unit', label: 'Unit' },
+  { key: 'rate', label: 'Rate' },
+  { key: 'gst', label: 'GST %' },
+  { key: 'discount', label: 'Discount Amount' },
+  { key: 'image', label: 'Image', render: v => v ? <a href={v} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontSize: '0.78rem' }}>View Link</a> : '—' },
+  { key: 'leadDays', label: 'Approx Lead Days' },
+  { key: 'companyName', label: 'Company Name' },
 ];
 
 function IndentListTable({ rows }) {
@@ -177,23 +179,27 @@ function IndentListTable({ rows }) {
 /* ─── Main Page ────────────────────────────────────── */
 export default function IndentManagementPage() {
   const dispatch = useDispatch();
-  const records  = useSelector(s => s.workflow.records);
-  const theme    = useTheme();
-  const isDark   = theme.palette.mode === 'dark';
+  const records = useSelector(s => s.workflow.records);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const imageRef = useRef(null);
   const [imageFile, setImageFile] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { products, vendors, companies, refresh } = useData();
 
   const {
     register: reg,
     control,
     watch,
     reset,
+    setValue,
     handleSubmit,
     formState: { errors },
   } = useForm({
     defaultValues: {
-      companyName: 'Acemark Stationers',
+      companyName: '',
       orderBy: '',
       partyName: '',
       filterGroup: '',
@@ -204,39 +210,41 @@ export default function IndentManagementPage() {
 
   const { fields, replace, remove } = useFieldArray({ control, name: 'items' });
 
-  const partyName   = watch('partyName');
+  const partyName = watch('partyName');
   const filterGroup = watch('filterGroup');
-  const searchItem  = watch('searchItem');
+  const searchItem = watch('searchItem');
 
   /* unique group names for the selected party */
   const partyGroups = useMemo(() => {
     if (!partyName) return [];
-    const groups = PRODUCTS
+    const groups = products
       .filter(p => p.supplierName === partyName)
       .map(p => p.groupName);
     return [...new Set(groups)];
-  }, [partyName]);
+  }, [partyName, products]);
 
   /* load all party items when party changes */
   useEffect(() => {
+    setValue('filterGroup', '');
     if (!partyName) { replace([]); return; }
-    const items = PRODUCTS
+    const items = products
       .filter(p => p.supplierName === partyName)
       .map(p => ({
-        _productId:  p.id,
-        groupName:   p.groupName,
-        itemName:    p.itemName,
-        unit:        p.unit,
-        rate:        p.purchaseRate,
-        gst:         0,
-        itemCode:    p.itemCode,
-        leadDays:    0,
+        _productId: p.id,
+        groupName: p.groupName,
+        itemName: p.itemName,
+        unit: p.unit,
+        rate: p.purchaseRate,
+        gst: 0,
+        itemCode: p.itemCode,
+        leadDays: 0,
         description: '',
-        discount:    0,
-        quantity:    0,
+        discount: 0,
+        quantity: 0,
       }));
     replace(items);
-  }, [partyName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [partyName, products]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   /* filtered visible rows */
   const visibleFields = useMemo(() =>
@@ -244,67 +252,122 @@ export default function IndentManagementPage() {
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => {
         const groupMatch = !filterGroup || item.groupName === filterGroup;
-        const nameMatch  = !searchItem  || item.itemName.toLowerCase().includes(searchItem.toLowerCase());
+        const nameMatch = !searchItem || item.itemName.toLowerCase().includes(searchItem.toLowerCase());
         return groupMatch && nameMatch;
       }),
     [fields, filterGroup, searchItem]
   );
 
-  const onSubmit = data => {
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
+  const onSubmit = async data => {
     const activeItems = data.items.filter(it => Number(it.quantity) > 0);
     if (activeItems.length === 0) {
       toast.error('Enter a quantity > 0 for at least one item.');
       return;
     }
 
-    const indentNo  = generateIndentNumber(records, data.partyName);
-    const existingForParty = records.filter(r => r.indentNumber === indentNo);
-    const startSerial = existingForParty.length > 0 ? Math.max(...existingForParty.map(r => r.serialNo || 0)) : 0;
-    
-    const timestamp = new Date().toISOString();
-    const imageUrl  = imageFile ? URL.createObjectURL(imageFile) : null;
+    setIsSubmitting(true);
+    let imageUrl = '';
+    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
 
-    activeItems.forEach((item, i) => {
-      const qty  = Number(item.quantity) || 0;
-      const rate = Number(item.rate)     || 0;
-      const gst  = Number(item.gst)      || 0;
-      const disc = Number(item.discount) || 0;
+    if (imageFile && folderId) {
+      try {
+        const base64Data = await fileToBase64(imageFile);
+        const uploadRes = await gasApi.uploadFile({
+          base64Data,
+          fileName: imageFile.name,
+          mimeType: imageFile.type,
+          folderId,
+        });
+        if (uploadRes.success) {
+          imageUrl = uploadRes.fileUrl;
+        }
+      } catch (err) {
+        console.error("Failed to upload image:", err);
+        toast.warning("Failed to upload image to Google Drive, proceeding without image.");
+      }
+    }
 
-      dispatch(addRecord({
-        id: Date.now() + i,
-        indentNumber: indentNo,
-        serialNo:     startSerial + i + 1,
-        createdDate:  timestamp,
-        date:         timestamp.slice(0, 10),
-        orderBy:      data.orderBy,
-        partyName:    data.partyName,
-        companyName:  data.companyName,
-        image:        imageUrl,
-        groupName:    item.groupName,
-        itemName:     item.itemName,
-        itemCode:     item.itemCode,
-        description:  item.description,
-        quantity:     qty,
-        unit:         item.unit,
-        rate,
-        gst,
-        discount:     disc,
-        amount:       (qty * rate * (1 + gst / 100)) - disc,
-        leadDays:     Number(item.leadDays) || 0,
-        status:       'In Progress',
-        workflowStage: {
-          indent: 'Completed', purchaseOrder: 'Pending', approvalPO: null,
-          sendPO: null, followUp: null, logistics: null,
-          receiveMaterial: null, liftReceiver: null, tallyEntry: null,
-        },
-      }));
-    });
+    try {
+      const timestamp = formatTimestamp();
 
-    toast.success(`Indent ${indentNo} submitted with ${activeItems.length} item(s)!`);
-    reset({ companyName: data.companyName, orderBy: '', partyName: '', filterGroup: '', searchItem: '', items: [] });
-    setImageFile(null);
-    if (imageRef.current) imageRef.current.value = '';
-    setIsFormOpen(false);
+      const rowsData = activeItems.map((item, idx) => [
+        timestamp,
+        "", // Indent Number: Will be generated and filled by the backend doPost action
+        idx + 1, // Serial No.
+        data.orderBy,
+        data.partyName,
+        item.groupName,
+        item.itemName,
+        item.itemCode || "",
+        item.description || "",
+        Number(item.quantity) || 0,
+        item.unit,
+        Number(item.rate) || 0,
+        Number(item.gst) || 0,
+        Number(item.discount) || 0,
+        imageUrl || "",
+        Number(item.leadDays) || 0,
+        data.companyName
+      ]);
+
+      const result = await gasApi.batchInsertIndent("INDENT-PO", rowsData);
+      if (result.success) {
+        const indentNumber = result.indentNumber || "";
+
+        // Construct initial rows for PO-History sheet (columns A-R)
+        const historyRows = activeItems.map((item, idx) => {
+          const qty = Number(item.quantity) || 0;
+          const rate = Number(item.rate) || 0;
+          const discount = Number(item.discount) || 0;
+          const gst = Number(item.gst) || 0;
+          const discounted = (qty * rate) - discount;
+          const total = discounted * (1 + gst / 100);
+
+          return [
+            timestamp,               // Timestamp (A)
+            "",                      // Actual (B)
+            data.partyName || "",    // Party Name (C)
+            "",                      // Po Number (D)
+            item.itemCode || "",     // Product Code (E)
+            item.itemName || "",     // Product (F)
+            item.groupName || "",    // Description (G)
+            qty,                     // Quntity (H)
+            item.unit || "",         // Unit (I)
+            rate,                    // Rate (J)
+            discount,                // Discount% (K)
+            gst,                     // Gst % (L)
+            discounted,              // Amount (M)
+            total,                   // Total Amount (N)
+            "",                      // PO Copy (O)
+            indentNumber,            // Indent No. (P)
+            idx + 1,                 // Product No. (Q)
+            data.companyName || ""   // Company Name (R)
+          ];
+        });
+
+        // Batch insert initial pending rows into PO-History
+        await gasApi.batchInsert("PO-History", historyRows);
+
+        toast.success(`Indent ${indentNumber} submitted with ${activeItems.length} item(s)!`);
+        await refresh();
+        reset({ companyName: data.companyName, orderBy: '', partyName: '', filterGroup: '', searchItem: '', items: [] });
+        setImageFile(null);
+        if (imageRef.current) imageRef.current.value = '';
+        setIsFormOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to submit indent:", err);
+      toast.error(err.message || "Failed to submit indent request.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /* ── render ────────────────────────────────────────── */
@@ -312,9 +375,9 @@ export default function IndentManagementPage() {
     <Box sx={{ width: '100%' }}>
 
       {/* ── Page Header ── */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
             <AssignmentIcon sx={{ fontSize: 30, color: 'primary.main' }} />
             <Typography variant="h5" fontWeight={800} color="primary.main">Indent Form</Typography>
           </Box>
@@ -369,7 +432,10 @@ export default function IndentManagementPage() {
                     error={!!errors.companyName}
                     sx={INPUT_SX}
                   >
-                    {COMPANIES.map(c => <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>)}
+                    {companies.map(c => <MenuItem key={c.id} value={c.companyName}>{c.companyName}</MenuItem>)}
+                    {field.value && !companies.some(c => c.companyName === field.value) && (
+                      <MenuItem value={field.value}>{field.value}</MenuItem>
+                    )}
                   </TextField>
                 )} />
               </Grid>
@@ -401,7 +467,7 @@ export default function IndentManagementPage() {
                     error={!!errors.partyName}
                     sx={INPUT_SX}
                   >
-                    {VENDORS.map(v => <MenuItem key={v.id} value={v.name}>{v.name}</MenuItem>)}
+                    {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                   </TextField>
                 )} />
               </Grid>
@@ -451,13 +517,14 @@ export default function IndentManagementPage() {
                 <Grid container spacing={2} mb={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>Filter by Group</Typography>
-                    <TextField
-                      {...reg('filterGroup')} select fullWidth size="small"
-                      sx={{ ...INPUT_SX, bgcolor: isDark ? 'background.paper' : 'white' }}
-                    >
-                      <MenuItem value="">All Groups</MenuItem>
-                      {partyGroups.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-                    </TextField>
+                     <TextField
+                       {...reg('filterGroup')} select fullWidth size="small"
+                       value={watch('filterGroup') || ''}
+                       sx={{ ...INPUT_SX, bgcolor: isDark ? 'background.paper' : 'white' }}
+                     >
+                       <MenuItem value="">All Groups</MenuItem>
+                       {partyGroups.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                     </TextField>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>Search Item</Typography>
@@ -480,7 +547,7 @@ export default function IndentManagementPage() {
                   <Table size="small" sx={{ minWidth: 1100, tableLayout: 'auto' }}>
                     <TableHead>
                       <TableRow sx={{ bgcolor: isDark ? 'grey.900' : '#f1f5f9' }}>
-                        {['S.No.','Group','Item','Unit','Rate','GST %','Item Code','Lead Days','Description','Discount %','Quantity *','Action'].map(h => (
+                        {['S.No.', 'Group', 'Item', 'Unit', 'Rate', 'GST %', 'Item Code', 'Lead Days', 'Description', 'Discount %', 'Quantity *', 'Action'].map(h => (
                           <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.72rem', py: 1.2, px: 1.5, color: 'text.secondary', whiteSpace: 'nowrap' }}>{h}</TableCell>
                         ))}
                       </TableRow>
@@ -500,7 +567,7 @@ export default function IndentManagementPage() {
                           <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.82rem', fontWeight: 500, maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.itemName}</TableCell>
                           <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.78rem' }}>{item.unit}</TableCell>
                           <TableCell sx={{ py: 1, px: 1 }}><NumInput regProps={reg(`items.${index}.rate`)} defaultValue={item.rate} /></TableCell>
-                          <TableCell sx={{ py: 1, px: 1 }}><NumInput regProps={reg(`items.${index}.gst`)}  defaultValue={item.gst} /></TableCell>
+                          <TableCell sx={{ py: 1, px: 1 }}><NumInput regProps={reg(`items.${index}.gst`)} defaultValue={item.gst} /></TableCell>
                           <TableCell sx={{ py: 1, px: 1 }}>
                             <TextField
                               {...reg(`items.${index}.itemCode`)}
@@ -548,13 +615,30 @@ export default function IndentManagementPage() {
               </Box>
             )}
 
-            {/* Submit Button */}
-            <Box textAlign="center" mt={1}>
+            {/* Action Buttons */}
+            <Stack direction="row" spacing={2} justifyContent="center" mt={1}>
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="large"
+                disabled={isSubmitting}
+                onClick={() => setIsFormOpen(false)}
+                sx={{
+                  px: 5, py: 1.3,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                }}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 variant="contained"
                 size="large"
-                startIcon={<RocketLaunchIcon />}
+                disabled={isSubmitting}
+                startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />}
                 sx={{
                   px: 5, py: 1.3,
                   bgcolor: '#059669',
@@ -567,9 +651,9 @@ export default function IndentManagementPage() {
                   '&:hover': { bgcolor: '#047857', boxShadow: '0 6px 18px rgba(5,150,105,0.45)' },
                 }}
               >
-                🚀 Submit Request
+                {isSubmitting ? 'Submitting...' : ' Submit Request'}
               </Button>
-            </Box>
+            </Stack>
 
           </form>
         </DialogContent>

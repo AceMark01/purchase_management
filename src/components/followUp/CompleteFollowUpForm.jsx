@@ -1,11 +1,12 @@
 import { useForm, Controller } from 'react-hook-form';
-import { useDispatch }         from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, MenuItem, Box, Typography
 } from '@mui/material';
 import PhoneCallbackIcon from '@mui/icons-material/PhoneCallback';
-import { completeStage, updateRecord } from '../../store/slices/workflowSlice';
+import { useData } from '../../contexts/DataContext';
+import { formatTimestamp } from '../../utils/formatters';
 import { toast } from 'react-toastify';
 
 const SectionLabel = ({ children }) => (
@@ -18,48 +19,54 @@ const SectionLabel = ({ children }) => (
 // groupIds = all record IDs that belong to this PO group
 export default function CompleteFollowUpForm({ open, onClose, selectedRow, groupIds }) {
   const dispatch = useDispatch();
+  const allRecords = useSelector((state) => state.workflow.records) || [];
+  const { refresh, addRow, updateRow } = useData();
 
   const { control, handleSubmit, watch, register, formState: { errors } } = useForm({
     defaultValues: {
-      followUpStatus:       '',
-      followUpBy:           '',
-      expectedArrivalDate:  '',
-      nextFollowDate:       '',
-      remarks:              '',
+      followUpStatus: '',
+      followUpBy: '',
+      expectedArrivalDate: '',
+      nextFollowDate: '',
+      remarks: '',
     },
   });
 
   const followUpStatus = watch('followUpStatus');
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     if (!selectedRow) return;
     const ids = groupIds?.length ? groupIds : [selectedRow.id];
+    const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
-    if (data.followUpStatus === 'Arrange Logistics') {
-      ids.forEach(id => {
-        dispatch(updateRecord({ id, followUpDetails: data, followUpType: 'logistics' }));
-        dispatch(completeStage({ id, currentStage: 'followUp', nextStageOverride: 'logistics' }));
-      });
-      toast.success(`Follow-up done! ${ids.length} item(s) moved to Arrange Logistics.`);
-      onClose();
+    try {
+      // Loop sequentially to avoid concurrent Google Sheets LockService issues
+      for (const record of matchedRecords) {
+        await addRow("followUps", {
+          "Indent No.": record.indentNumber,
+          "Follow-up Status": data.followUpStatus,
+          "Excepted Arrival Date": data.expectedArrivalDate,
+          "Remark": data.remarks,
+          "Follow Up By": data.followUpBy,
+          "Next Follow-up Date": data.nextFollowDate,
+          "CodeNO": "",
+          "Actual": (data.followUpStatus === 'Further Follow Up') ? "" : formatTimestamp()
+        });
 
-    } else if (data.followUpStatus === 'Direct Receiving') {
-      ids.forEach(id => {
-        dispatch(updateRecord({ id, followUpDetails: data, followUpType: 'directReceiving' }));
-        dispatch(completeStage({ id, currentStage: 'followUp', nextStageOverride: 'logistics' }));
-      });
-      toast.success(`Follow-up done! ${ids.length} item(s) moved to Logistics (Direct Receiving).`);
-      onClose();
+        // If user cancelled, also update the indent status in the main sheet
+        if (data.followUpStatus === 'Cancel') {
+          await updateRow('indents', record.id, {
+            "Order Cancel": "Cancel"
+          });
+        }
+      }
 
-    } else if (data.followUpStatus === 'Further Follow Up') {
-      ids.forEach(id => dispatch(updateRecord({ id, followUpDetails: data })));
-      toast.success('Further follow-up scheduled. Record remains Pending.');
+      toast.success('Follow-up status recorded successfully!');
+      await refresh();
       onClose();
-
-    } else if (data.followUpStatus === 'Cancel') {
-      ids.forEach(id => dispatch(updateRecord({ id, followUpDetails: data, status: 'Cancelled' })));
-      toast.info('Follow-up cancelled.');
-      onClose();
+    } catch (err) {
+      console.error("Failed to save follow-up:", err);
+      toast.error(err.message || "Failed to save follow-up record to database.");
     }
   };
 
@@ -73,7 +80,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
             <PhoneCallbackIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>Complete Follow-Up</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Complete Follow-Up</Typography>
             {selectedRow && (
               <Typography variant="caption" color="text.secondary">
                 {selectedRow.poNumber} · {selectedRow.partyName}

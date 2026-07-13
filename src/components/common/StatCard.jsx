@@ -76,7 +76,7 @@ export default function StatCard({ title, value, icon: Icon, color = 'primary', 
             variant="caption"
             color="text.secondary"
             fontWeight={500}
-            textAlign="right"
+            align="right"
             sx={{ flex: 1, mt: 0.25, lineHeight: 1.3 }}
           >
             {title}

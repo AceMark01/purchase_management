@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import mockData from '../../data/mockData';
 
 const STAGES = [
   'indent',
@@ -14,7 +13,7 @@ const STAGES = [
 ];
 
 const initialState = {
-  records: mockData.records,
+  records: [],
   loading: false,
   error: null,
 };
@@ -23,10 +22,14 @@ const workflowSlice = createSlice({
   name: 'workflow',
   initialState,
   reducers: {
+    setRecords: (state, action) => {
+      state.records = action.payload;
+    },
     addRecord: (state, action) => {
       // Push the record exactly as supplied by the caller (id and workflowStage are set there)
       state.records.push(action.payload);
     },
+
     updateRecord: (state, action) => {
       // General update (used in Indent Management primarily)
       const index = state.records.findIndex((r) => r.id === action.payload.id);
@@ -68,7 +71,7 @@ const workflowSlice = createSlice({
   },
 });
 
-export const { addRecord, updateRecord, deleteRecord, completeStage } = workflowSlice.actions;
+export const { setRecords, addRecord, updateRecord, deleteRecord, completeStage } = workflowSlice.actions;
 
 // Selectors
 export const selectRecords = (state) => state.workflow.records;

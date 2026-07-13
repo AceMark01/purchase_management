@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, MenuItem, IconButton, Tooltip, Chip, Divider, Switch, FormControlLabel } from '@mui/material';
+import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, MenuItem, IconButton, Tooltip, Chip, Divider, Switch } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import { EditBtn, DeleteBtn } from '../../components/common/ActionButtons';
 import { toast } from 'react-toastify';
-import { addUser, updateUser, deleteUser, toggleStatus } from '../../store/slices/userSlice';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
 import DataTable from '../../components/common/DataTable';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -24,15 +24,13 @@ const COLUMNS = [
   { key: 'lastLogin', label: 'Last Login', minWidth: 110, render: (v) => formatDate(v) },
 ];
 
-function UserForm({ open, onClose, editItem }) {
-  const dispatch = useDispatch();
+function UserForm({ open, onClose, editItem, onSave }) {
   const { register, handleSubmit, control, formState: { errors } } = useForm({
-    defaultValues: editItem || { name: '', email: '', password: '', role: 'user', department: '', status: 'active', lastLogin: new Date().toISOString().slice(0, 10) },
+    defaultValues: editItem || { name: '', email: '', password: '', role: 'user', department: '', status: 'active', lastLogin: '' },
   });
 
   const onSubmit = (data) => {
-    if (editItem) { dispatch(updateUser({ ...editItem, ...data })); toast.success('User updated!'); }
-    else { dispatch(addUser(data)); toast.success('User created!'); }
+    onSave(data);
     onClose();
   };
 
@@ -81,14 +79,79 @@ function UserForm({ open, onClose, editItem }) {
 }
 
 export default function UserManagementPage() {
-  const dispatch = useDispatch();
-  const items = useSelector((s) => s.users.items);
+  const { users: items = [], refresh, updateRow } = useData();
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
-  const handleDelete = () => { dispatch(deleteUser(selected.id)); toast.success('User deleted!'); setDeleteOpen(false); setSelected(null); };
-  const handleToggleStatus = (row) => { dispatch(toggleStatus(row.id)); toast.info(`User ${row.status === 'active' ? 'deactivated' : 'activated'}!`); };
+  const handleSave = async (data) => {
+    const isEdit = !!selected;
+    try {
+      let result;
+      const payload = {
+        "Full Name": data.name,
+        "Email": data.email,
+        "Password": data.password || (selected ? selected.password : "123456"),
+        "Role": data.role,
+        "Department": data.department,
+        "Status": data.status || "active",
+        "Last Login": isEdit ? (selected.lastLogin || "") : "",
+      };
+
+      if (isEdit) {
+        await updateRow('users', selected._row, payload);
+        result = { success: true };
+      } else {
+        const rowValues = [
+          payload["Full Name"],
+          payload["Email"],
+          payload["Password"],
+          payload["Role"],
+          payload["Department"],
+          payload["Status"],
+          payload["Last Login"]
+        ];
+        result = await gasApi.insertInColumns("Administration", 1, rowValues, 2);
+      }
+
+      if (result.success) {
+        toast.success(isEdit ? 'User updated!' : 'User created!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to save user.");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const result = await gasApi.deleteRow("Administration", selected._row);
+      if (result.success) {
+        toast.success('User deleted!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete user.");
+    } finally {
+      setDeleteOpen(false);
+      setSelected(null);
+    }
+  };
+
+  const handleToggleStatus = async (row) => {
+    const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    try {
+      await updateRow('users', row._row, { "Status": newStatus });
+      toast.info(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}!`);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to toggle status.");
+    }
+  };
+
   const handleReset = (row) => { toast.success(`Password reset link sent to ${row.email}`); };
 
   const actions = useCallback((row) => [
@@ -98,7 +161,7 @@ export default function UserManagementPage() {
     </Tooltip>,
     <Tooltip key="reset" title="Reset Password"><IconButton size="small" color="warning" onClick={() => handleReset(row)}><LockResetIcon fontSize="small" /></IconButton></Tooltip>,
     <DeleteBtn key="delete" onClick={() => { setSelected(row); setDeleteOpen(true); }} />,
-  ], []);
+  ], [handleToggleStatus]);
 
   return (
     <Box>
@@ -107,7 +170,9 @@ export default function UserManagementPage() {
         actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelected(null); setFormOpen(true); }}>Create User</Button>}
       />
       <DataTable columns={COLUMNS} rows={items} title="Users" searchKey={['name', 'email', 'department']} actions={actions} />
-      <UserForm open={formOpen} onClose={() => { setFormOpen(false); setSelected(null); }} editItem={selected} />
+      {formOpen && (
+        <UserForm open={formOpen} onClose={() => { setFormOpen(false); setSelected(null); }} editItem={selected} onSave={handleSave} />
+      )}
       <ConfirmDialog open={deleteOpen} onConfirm={handleDelete} onCancel={() => setDeleteOpen(false)} message={`Delete user "${selected?.name}"?`} />
     </Box>
   );

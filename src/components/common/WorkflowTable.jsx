@@ -1,5 +1,6 @@
 import React from 'react';
 import DataTable from './DataTable';
+import { formatDate } from '../../utils/formatters';
 
 export const WORKFLOW_COLUMNS = [
   { key: 'indentNumber', label: 'Indent Number', minWidth: 150 },
@@ -20,7 +21,7 @@ export const WORKFLOW_COLUMNS = [
   { key: 'leadDays', label: 'Approx. Lead Days', minWidth: 150 },
   { key: 'companyName', label: 'Company Name', minWidth: 180 },
   { key: 'status', label: 'Status', type: 'status', minWidth: 130 },
-  { key: 'createdDate', label: 'Created Date', minWidth: 130 },
+  { key: 'createdDate', label: 'Created Date', minWidth: 130, render: (v) => formatDate(v) },
 ];
 
 export default function WorkflowTable({ rows, loading, title, actions }) {

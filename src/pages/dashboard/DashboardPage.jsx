@@ -21,7 +21,6 @@ import TrendingUpIcon   from '@mui/icons-material/TrendingUp';
 import StatCard         from '../../components/common/StatCard';
 import PageHeader       from '../../components/common/PageHeader';
 import { formatCurrency, formatDate, statusColor } from '../../utils/formatters';
-import { VENDORS, COMPANIES } from '../../data/mockData';
 
 const CHART_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -90,6 +89,7 @@ export default function DashboardPage() {
   const isDark = theme.palette.mode === 'dark';
 
   const records = useSelector((s) => s.workflow.records);
+  const vendors = useSelector((s) => s.vendorMaster.items) || [];
 
   const stats = useMemo(() => ({
     totalIndents:     records.length,
@@ -99,8 +99,8 @@ export default function DashboardPage() {
     totalPOs:         records.filter((r) => r.workflowStage.purchaseOrder === 'Completed').length,
     pendingFollowUps: records.filter((r) => r.workflowStage.followUp === 'Pending').length,
     receivedMaterials:records.filter((r) => r.workflowStage.receiveMaterial === 'Completed').length,
-    totalVendors:     VENDORS.length,
-  }), [records]);
+    totalVendors:     vendors.length,
+  }), [records, vendors]);
 
   const monthlyTrend = useMemo(() =>
     MONTHS.map((month, idx) => {

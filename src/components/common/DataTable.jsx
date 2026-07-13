@@ -22,7 +22,7 @@ function EmptyState() {
         <TableRowsIcon sx={{ fontSize: 32, color: 'text.disabled' }} />
       </Box>
       <Typography variant="subtitle2" fontWeight={600} color="text.secondary">No records found</Typography>
-      <Typography variant="body2" color="text.disabled" textAlign="center" maxWidth={300}>
+      <Typography variant="body2" color="text.disabled" align="center" sx={{ maxWidth: 300 }}>
         Try adjusting the search or filter to find what you're looking for.
       </Typography>
     </Box>
@@ -120,6 +120,11 @@ export default function DataTable({
   searchKey,
   actions,
   density = 'medium',
+  showCheckbox = false,
+  selectedRowIds = [],
+  onSelectedRowIdsChange,
+  hideIndexColumn = false,
+  hideActionsColumn = false,
 }) {
   const theme    = useTheme();
   const isDark   = theme.palette.mode === 'dark';
@@ -176,6 +181,20 @@ export default function DataTable({
   };
 
   const rowPy = density === 'compact' ? '8px' : '12px';
+
+  const allPageSelected = paginated.length > 0 && paginated.every(r => selectedRowIds.includes(r.id));
+  const somePageSelected = paginated.some(r => selectedRowIds.includes(r.id)) && !allPageSelected;
+
+  const handleSelectAllClick = (event) => {
+    if (event.target.checked) {
+      const newSelecteds = [...new Set([...selectedRowIds, ...paginated.map(r => r.id)])];
+      if (onSelectedRowIdsChange) onSelectedRowIdsChange(newSelecteds);
+    } else {
+      const paginatedIds = paginated.map(r => r.id);
+      const newSelecteds = selectedRowIds.filter(id => !paginatedIds.includes(id));
+      if (onSelectedRowIdsChange) onSelectedRowIdsChange(newSelecteds);
+    }
+  };
 
   /* ─────────────────────────────────────────────────── */
   return (
@@ -282,11 +301,24 @@ export default function DataTable({
           <Table stickyHeader size={density === 'compact' ? 'small' : 'medium'} sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: 48, minWidth: 48, maxWidth: 48, py: '10px', px: 2, position: 'sticky', left: 0, bgcolor: isDark ? 'grey.900' : 'grey.100', zIndex: 5 }}>
-                  #
-                </TableCell>
-                {actions && (
-                  <TableCell align="center" sx={{ width: 140, minWidth: 140, maxWidth: 140, py: '10px', px: 2, position: 'sticky', left: 48, bgcolor: isDark ? 'grey.900' : 'grey.100', zIndex: 4, boxShadow: '2px 0 5px rgba(0,0,0,0.05)' }}>
+                {showCheckbox && (
+                  <TableCell sx={{ width: 48, minWidth: 48, maxWidth: 48, py: '10px', px: 2, position: 'sticky', left: 0, bgcolor: isDark ? 'grey.900' : 'grey.100', zIndex: 5 }}>
+                    <Checkbox
+                      size="small"
+                      indeterminate={somePageSelected}
+                      checked={allPageSelected}
+                      onChange={handleSelectAllClick}
+                      sx={{ p: 0 }}
+                    />
+                  </TableCell>
+                )}
+                {!hideIndexColumn && (
+                  <TableCell sx={{ width: 48, minWidth: 48, maxWidth: 48, py: '10px', px: 2, position: 'sticky', left: showCheckbox ? 48 : 0, bgcolor: isDark ? 'grey.900' : 'grey.100', zIndex: 5 }}>
+                    #
+                  </TableCell>
+                )}
+                {actions && !hideActionsColumn && (
+                  <TableCell align="center" sx={{ width: 140, minWidth: 140, maxWidth: 140, py: '10px', px: 2, position: 'sticky', left: (showCheckbox ? 48 : 0) + (!hideIndexColumn ? 48 : 0), bgcolor: isDark ? 'grey.900' : 'grey.100', zIndex: 4, boxShadow: '2px 0 5px rgba(0,0,0,0.05)' }}>
                     Actions
                   </TableCell>
                 )}
@@ -310,7 +342,7 @@ export default function DataTable({
             <TableBody>
               {loading && Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: visibleColumns.length + (actions ? 2 : 1) }).map((_, j) => (
+                  {Array.from({ length: visibleColumns.length + (showCheckbox ? 1 : 0) + (!hideIndexColumn ? 1 : 0) + (actions && !hideActionsColumn ? 1 : 0) }).map((_, j) => (
                     <TableCell key={j} sx={{ py: rowPy }}><Skeleton animation="wave" height={20} sx={{ borderRadius: 1 }} /></TableCell>
                   ))}
                 </TableRow>
@@ -318,47 +350,68 @@ export default function DataTable({
 
               {!loading && paginated.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={visibleColumns.length + (actions ? 2 : 1)} sx={{ border: 0, p: 0 }}>
+                  <TableCell colSpan={visibleColumns.length + (showCheckbox ? 1 : 0) + (!hideIndexColumn ? 1 : 0) + (actions && !hideActionsColumn ? 1 : 0)} sx={{ border: 0, p: 0 }}>
                     <EmptyState />
                   </TableCell>
                 </TableRow>
               )}
 
-              {!loading && paginated.map((row, idx) => (
-                <TableRow key={row.id || idx} hover sx={{
-                  transition: 'background 0.1s ease',
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, isDark ? 0.05 : 0.03) },
-                  '&:last-child td': { borderBottom: 0 },
-                }}>
-                  <TableCell sx={{ py: rowPy, px: 2, color: 'text.disabled', fontSize: '0.75rem', fontWeight: 500, width: 48, minWidth: 48, maxWidth: 48, position: 'sticky', left: 0, bgcolor: isDark ? '#1e293b' : '#fff', zIndex: 3 }}>
-                    {page * rowsPerPage + idx + 1}
-                  </TableCell>
+              {!loading && paginated.map((row, idx) => {
+                const isSelected = selectedRowIds.includes(row.id);
+                return (
+                  <TableRow key={row.id || idx} hover sx={{
+                    transition: 'background 0.1s ease',
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, isDark ? 0.05 : 0.03) },
+                    '&:last-child td': { borderBottom: 0 },
+                    bgcolor: isSelected ? alpha(theme.palette.primary.main, isDark ? 0.15 : 0.08) : 'inherit',
+                  }}>
+                    {showCheckbox && (
+                      <TableCell sx={{ py: rowPy, px: 2, width: 48, minWidth: 48, maxWidth: 48, position: 'sticky', left: 0, bgcolor: isSelected ? (isDark ? '#2c3b52' : '#f0f7ff') : (isDark ? '#1e293b' : '#fff'), zIndex: 3 }}>
+                        <Checkbox
+                          size="small"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSelecteds = e.target.checked
+                              ? [...selectedRowIds, row.id]
+                              : selectedRowIds.filter(id => id !== row.id);
+                            if (onSelectedRowIdsChange) onSelectedRowIdsChange(newSelecteds);
+                          }}
+                          sx={{ p: 0 }}
+                        />
+                      </TableCell>
+                    )}
+                    {!hideIndexColumn && (
+                      <TableCell sx={{ py: rowPy, px: 2, color: 'text.disabled', fontSize: '0.75rem', fontWeight: 500, width: 48, minWidth: 48, maxWidth: 48, position: 'sticky', left: showCheckbox ? 48 : 0, bgcolor: isSelected ? (isDark ? '#2c3b52' : '#f0f7ff') : (isDark ? '#1e293b' : '#fff'), zIndex: 3 }}>
+                        {page * rowsPerPage + idx + 1}
+                      </TableCell>
+                    )}
 
-                  {actions && (
-                    <TableCell align="center" sx={{ py: rowPy, px: 1.5, width: 140, minWidth: 140, maxWidth: 140, position: 'sticky', left: 48, bgcolor: isDark ? '#1e293b' : '#fff', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.02)' }}>
-                      <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'center', alignItems: 'center' }}>
-                        {actions(row)}
-                      </Stack>
-                    </TableCell>
-                  )}
+                    {actions && !hideActionsColumn && (
+                      <TableCell align="center" sx={{ py: rowPy, px: 1.5, width: 140, minWidth: 140, maxWidth: 140, position: 'sticky', left: (showCheckbox ? 48 : 0) + (!hideIndexColumn ? 48 : 0), bgcolor: isSelected ? (isDark ? '#2c3b52' : '#f0f7ff') : (isDark ? '#1e293b' : '#fff'), zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.02)' }}>
+                        <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'center', alignItems: 'center' }}>
+                          {actions(row)}
+                        </Stack>
+                      </TableCell>
+                    )}
 
-                  {visibleColumns.map((col) => (
-                    <TableCell key={col.key} sx={{ py: rowPy, px: 2, maxWidth: col.maxWidth || 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: col.wrap ? 'normal' : 'nowrap' }}>
-                      {col.render ? (
-                        col.render(row[col.key], row)
-                      ) : col.type === 'status' ? (
-                        <Chip label={row[col.key]} size="small" color={statusColor(row[col.key])} sx={{ fontWeight: 600 }} />
-                      ) : col.type === 'currency' ? (
-                        <Typography variant="body2" fontWeight={600} color="text.primary">
-                          ₹{Number(row[col.key] || 0).toLocaleString('en-IN')}
-                        </Typography>
-                      ) : (
-                        <Typography variant="body2" color="text.primary">{String(row[col.key] ?? '')}</Typography>
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+                    {visibleColumns.map((col) => (
+                      <TableCell key={col.key} sx={{ py: rowPy, px: 2, maxWidth: col.maxWidth || 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: col.wrap ? 'normal' : 'nowrap' }}>
+                        {col.render ? (
+                          col.render(row[col.key], row)
+                        ) : col.type === 'status' ? (
+                          <Chip label={row[col.key]} size="small" color={statusColor(row[col.key])} sx={{ fontWeight: 600 }} />
+                        ) : col.type === 'currency' ? (
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
+                            ₹{Number(row[col.key] || 0).toLocaleString('en-IN')}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.primary">{String(row[col.key] ?? '')}</Typography>
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
