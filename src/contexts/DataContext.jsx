@@ -82,7 +82,7 @@ const SHEET_MAP = {
   "companies": "Master Data",
   "vendors": "Master Data",
   "masterData": "Master Data",
-  "users": "Administration",
+  "users": "LOGIN",
   "whatsapp": "Whatsapp Form",
   "poSentStatus": "PO Sent Status",
   "poGenerate": "Po Generate",
@@ -191,7 +191,7 @@ export function DataProvider({ children }) {
           { key: "logistics", name: "LIFT-RECEIVED" },
           { key: "receiving", name: "RECEIVED-ACCOUNTS" },
           { key: "masterData", name: "Master Data" },
-          { key: "users", name: "Administration" }
+          { key: "users", name: "LOGIN" }
         ];
 
         const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
@@ -281,21 +281,59 @@ export function DataProvider({ children }) {
       })).filter(r => r["Vendor Name"] && String(r["Vendor Name"]).trim() !== "");
       const mappedVendors = vendorsObj.map((row, idx) => mapVendorRow(row, idx));
 
-      // Users: Administration sheet, header row = 2
-      const userHeaders = (usersRaw[1] || []).map(h => String(h || "").trim());
-      const usersObj = usersRaw.slice(2).map((row, idx) => ({
-        _row: idx + 3,
+      // Users: LOGIN sheet, header row = 1
+      const userHeaders = (usersRaw[0] || []).map(h => String(h || "").trim());
+      const usersObj = usersRaw.slice(1).map((row, idx) => ({
+        _row: idx + 2,
         ...sliceRowToObj(row, userHeaders, 0)
-      })).filter(r => r["Full Name"] && String(r["Full Name"]).trim() !== "");
-      const mappedUsers = usersObj.map((row, idx) => mapUserRow(row, idx));
+      })).filter(r => r["USERNAME"] && String(r["USERNAME"]).trim() !== "");
+      
+      const mappedUsers = usersObj.map((row, idx) => ({
+        id: idx + 1,
+        _row: row._row,
+        name: row["FULLNAME"] || "",
+        email: row["USERNAME"] || "",
+        password: row["PASSWORD"] || "",
+        role: String(row["ROLE"] || "user").toLowerCase(),
+        department: String(row["ROLE"] || "").toLowerCase() === 'admin' ? 'Management' : 'Procurement',
+        status: 'active',
+        lastLogin: ''
+      }));
 
-      // Settings: Administration sheet, columns H-AB (index 7-27), header row = 2
-      const settingsHeaders = (usersRaw[1] || []).slice(7, 28).map(h => String(h || "").trim());
-      const settingsObj = usersRaw.slice(2).map((row, idx) => ({
-        _row: idx + 3,
-        ...sliceRowToObj(row, settingsHeaders, 7)
-      })).filter(r => r["Role"] && String(r["Role"]).trim() !== "");
-      const mappedSettings = settingsObj.map((row, idx) => mapSettingsRow(row, idx));
+      // Settings: Loaded dynamically from localStorage/default configs
+      let currentPerms = {};
+      try {
+        const saved = localStorage.getItem('pms_settings_perms');
+        if (saved) currentPerms = JSON.parse(saved);
+      } catch (e) {}
+
+      const defaultPages = {
+        admin: [
+          'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
+          'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
+          'userManagement', 'settings', 'reports', 'master', 'vendors',
+        ],
+        user: [
+          'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
+          'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
+          'master', 'vendors',
+        ]
+      };
+
+      const mappedSettings = ['admin', 'user'].map((role, idx) => ({
+        id: idx + 1,
+        _row: idx + 1,
+        role: role,
+        pages: currentPerms[role]?.pages || defaultPages[role],
+        actions: currentPerms[role]?.actions || {
+          create: true,
+          read: true,
+          update: true,
+          delete: role === 'admin',
+          export: true,
+          print: true,
+        }
+      }));
       setSettingsState(mappedSettings);
 
       const fullHeaders = (masterDataRaw[1] || []).map(h => String(h || "").trim());
@@ -531,38 +569,33 @@ export function DataProvider({ children }) {
   };
 
   const updateSettingsRow = async (rowIndex, roleData, updatedBy) => {
-    const dataRow = [
-      roleData.role,
-      roleData.pages.includes('dashboard') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('indent') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('purchaseOrder') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('followUp') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('logistics') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('lifting') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('receiveMaterial') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('liftReceiver') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('tallyEntry') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('reports') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('userManagement') ? 'TRUE' : 'FALSE',
-      roleData.pages.includes('settings') ? 'TRUE' : 'FALSE',
-      roleData.actions.create ? 'TRUE' : 'FALSE',
-      roleData.actions.read ? 'TRUE' : 'FALSE',
-      roleData.actions.update ? 'TRUE' : 'FALSE',
-      roleData.actions.delete ? 'TRUE' : 'FALSE',
-      roleData.actions.export ? 'TRUE' : 'FALSE',
-      roleData.actions.print ? 'TRUE' : 'FALSE',
-      formatTimestamp(new Date()),
-      updatedBy,
-    ];
     setWriteLoading(true);
     try {
-      let res;
-      if (rowIndex) {
-        res = await gasApi.updateInColumns('Administration', rowIndex, 8, dataRow);
-      } else {
-        res = await gasApi.insertInColumns('Administration', 8, dataRow, 2);
-      }
-      return res;
+      let currentPerms = {};
+      try {
+        const saved = localStorage.getItem('pms_settings_perms');
+        if (saved) currentPerms = JSON.parse(saved);
+      } catch (e) {}
+
+      currentPerms[roleData.role] = {
+        pages: roleData.pages,
+        actions: roleData.actions
+      };
+
+      localStorage.setItem('pms_settings_perms', JSON.stringify(currentPerms));
+
+      setSettingsState(prev => prev.map(s => {
+        if (s.role === roleData.role) {
+          return {
+            ...s,
+            pages: roleData.pages,
+            actions: roleData.actions
+          };
+        }
+        return s;
+      }));
+
+      return { success: true };
     } finally {
       setWriteLoading(false);
     }

@@ -57,7 +57,7 @@ export const gasApi = {
       { key: "logistics", name: "LIFT-RECEIVED" },
       { key: "receiving", name: "RECEIVED-ACCOUNTS" },
       { key: "masterData", name: "Master Data" },
-      { key: "users", name: "Administration" }
+      { key: "users", name: "LOGIN" }
     ];
     const result = {
       indentForm: [["Request ID", "Timestamp", "Serial No.", "Order By", "Party Name", "Group Name", "Item Name", "Item code", "Discription", "Quantity", "Unit", "Rate", "GST %", "Discount Amount", "Image", "Approx Lead days Item will be dileverd ", "Company Name"]],

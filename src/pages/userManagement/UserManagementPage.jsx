@@ -89,13 +89,11 @@ export default function UserManagementPage() {
     try {
       let result;
       const payload = {
-        "Full Name": data.name,
-        "Email": data.email,
-        "Password": data.password || (selected ? selected.password : "123456"),
-        "Role": data.role,
-        "Department": data.department,
-        "Status": data.status || "active",
-        "Last Login": isEdit ? (selected.lastLogin || "") : "",
+        "FULLNAME": data.name,
+        "USERNAME": data.email,
+        "PASSWORD": data.password || (selected ? selected.password : "123456"),
+        "ROLE": String(data.role || "user").toUpperCase(),
+        "PAGE-ACCESS": String(data.role || "").toLowerCase() === 'admin' ? 'All' : '',
       };
 
       if (isEdit) {
@@ -103,15 +101,13 @@ export default function UserManagementPage() {
         result = { success: true };
       } else {
         const rowValues = [
-          payload["Full Name"],
-          payload["Email"],
-          payload["Password"],
-          payload["Role"],
-          payload["Department"],
-          payload["Status"],
-          payload["Last Login"]
+          payload["FULLNAME"],
+          payload["USERNAME"],
+          payload["PASSWORD"],
+          payload["ROLE"],
+          payload["PAGE-ACCESS"]
         ];
-        result = await gasApi.insertInColumns("Administration", 1, rowValues, 2);
+        result = await gasApi.insertInColumns("LOGIN", 1, rowValues, 1);
       }
 
       if (result.success) {
@@ -126,7 +122,7 @@ export default function UserManagementPage() {
 
   const handleDelete = async () => {
     try {
-      const result = await gasApi.deleteRow("Administration", selected._row);
+      const result = await gasApi.deleteRow("LOGIN", selected._row);
       if (result.success) {
         toast.success('User deleted!');
         await refresh();
@@ -141,15 +137,7 @@ export default function UserManagementPage() {
   };
 
   const handleToggleStatus = async (row) => {
-    const newStatus = row.status === 'active' ? 'inactive' : 'active';
-    try {
-      await updateRow('users', row._row, { "Status": newStatus });
-      toast.info(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}!`);
-      await refresh();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to toggle status.");
-    }
+    toast.info("Status toggling is disabled as all LOGIN users are active.");
   };
 
   const handleReset = (row) => { toast.success(`Password reset link sent to ${row.email}`); };
