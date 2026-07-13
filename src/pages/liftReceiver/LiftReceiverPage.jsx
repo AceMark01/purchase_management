@@ -14,6 +14,20 @@ import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 
 const getHistoryCols = (onViewPO) => [
   ...PO_COLUMNS,
+  { key: 'liftStatus', label: 'Lift Status', minWidth: 110 },
+  { key: 'liftPlanned', label: 'Planned 2', minWidth: 155 },
+  { key: 'liftActual', label: 'Actual 2', minWidth: 155 },
+  { key: 'liftTimeDelay', label: 'Time Delay 2', minWidth: 110 },
+  {
+    key: 'liftedImage',
+    label: 'Lifted Image',
+    minWidth: 120,
+    render: (_v, row) => row.liftedImage ? (
+      <Link href={row.liftedImage} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+        View Image
+      </Link>
+    ) : '—',
+  },
   {
     key: 'poViewLink',
     label: 'PO Document',

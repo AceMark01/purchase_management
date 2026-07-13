@@ -136,6 +136,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
         
         await addRow("receiving", {
           "Lift No.": liftNo,
+          "Indent No.": rec.indentNumber,
           "Party Name": rec.partyName,
           "Product Name": rec.itemName,
           "Qty": itemQty,

@@ -368,7 +368,7 @@ export function DataProvider({ children }) {
       >
         <CircularProgress size={50} thickness={4.5} />
         <Typography variant="body1" fontWeight={600} color="text.secondary">
-          Connecting to Google Sheets Database...
+          Loading...
         </Typography>
       </Box>
     );
