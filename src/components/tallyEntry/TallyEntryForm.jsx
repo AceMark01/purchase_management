@@ -30,13 +30,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: {
-      status: 'Complete',
-      plannedDateTime: '',
-      remarks: '',
-    }
-  });
+  const { handleSubmit } = useForm();
 
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
@@ -54,7 +48,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
     reader.onerror = error => reject(error);
   });
 
-  const onSubmit = async (data) => {
+  const onSubmit = async () => {
     if (!record) return;
     const ids = groupIds?.length ? groupIds : [record.id];
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
@@ -84,21 +78,26 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
       }
 
       const actualTime = new Date();
-      const plannedTime = new Date(data.plannedDateTime);
-      const diffMs = actualTime - plannedTime;
-      const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
-      const hh = Math.floor(totalSeconds / 3600);
-      const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const ss = (totalSeconds % 60).toString().padStart(2, '0');
-      const timeDelay = `${hh}:${mm}:${ss}`;
 
       for (const rec of matchedRecords) {
         if (rec._receivingRow) {
+          const recPlannedStr = rec.tallyPlanned ? String(rec.tallyPlanned).trim().replace(' ', 'T') : '';
+          let timeDelay = '00:00:00';
+          if (recPlannedStr) {
+            const recPlannedTime = new Date(recPlannedStr);
+            if (!isNaN(recPlannedTime.getTime())) {
+              const diffMs = actualTime - recPlannedTime;
+              const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
+              const hh = Math.floor(totalSeconds / 3600);
+              const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+              const ss = (totalSeconds % 60).toString().padStart(2, '0');
+              timeDelay = `${hh}:${mm}:${ss}`;
+            }
+          }
+
           await updateRow('receiving', rec._receivingRow, {
-            "Planned 3": formatTimestamp(data.plannedDateTime),
             "Actual 3": formatTimestamp(actualTime),
             "Time Delay 3": timeDelay,
-            "Status": data.status,
             "PO Attach": poUrl || "",
             "Bilty Attach": biltyUrl || "",
             "Invoice Attach": invoiceUrl || "",
@@ -123,17 +122,18 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
       maxWidth={false}
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 4,
           width: '720px',
           maxWidth: '96vw',
           maxHeight: '92vh',
+          boxShadow: '0px 20px 40px rgba(0,0,0,0.1)'
         }
       }}
     >
       {/* ── Header ── */}
       <DialogTitle sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'secondary.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: 'secondary.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FactCheckOutlinedIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
           </Box>
           <Box>
@@ -147,72 +147,43 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
       </DialogTitle>
 
       <Box component="form" id="tally-form" onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent sx={{ px: 3, py: 2.5, overflowY: 'auto' }}>
+        <DialogContent sx={{ px: 3, py: 3, overflowY: 'auto' }}>
           
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="body2" color="text.secondary">
-              Please confirm the Tally Entry status for <strong>{record?.indentNumber}</strong>. This is the final step in the workflow process.
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'secondary.50', borderRadius: 3, border: '1px solid', borderColor: 'secondary.100' }}>
+            <Typography variant="body2" color="secondary.800" fontWeight={500}>
+              Please upload the required documents to finalize the Tally Entry for <strong>{record?.indentNumber}</strong>.
             </Typography>
           </Box>
 
-          {/* Section 1: Verification Status */}
-          <SectionLabel>Verification Status</SectionLabel>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                select fullWidth size="small" label="Confirmation Status *"
-                defaultValue="Complete"
-                {...register('status', { required: 'Status is required' })}
-                error={!!errors.status} helperText={errors.status?.message}
-              >
-                <MenuItem value="Complete">Complete</MenuItem>
-                <MenuItem value="Not Complete">Not Complete</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth size="small" label="Planned DateTime *"
-                type="datetime-local"
-                InputLabelProps={{ shrink: true }}
-                {...register('plannedDateTime', { required: 'Planned DateTime is required' })}
-                error={!!errors.plannedDateTime} helperText={errors.plannedDateTime?.message}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth size="small" label="Final Remarks" multiline rows={2}
-                placeholder="Any final notes before closing the workflow..."
-                {...register('remarks')}
-              />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 2.5 }} />
-          
           <SectionLabel>Tally Document Attachments</SectionLabel>
-          <Grid container spacing={2} sx={{ mb: 1 }}>
+          <Grid container spacing={2.5}>
             <Grid item xs={12} sm={4}>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.75 }}>
+              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
                 PO Attach
               </Typography>
               <input accept="image/*,.pdf" style={{ display: 'none' }} id="po-file-upload" type="file" onChange={(e) => handleFileChange(e, 'po')} />
               <label htmlFor="po-file-upload">
                 <Box sx={{
                   border: '2px dashed', borderColor: poFile ? 'success.main' : 'divider',
-                  borderRadius: 2, p: 2, textAlign: 'center', cursor: 'pointer',
+                  borderRadius: 3, p: 3, textAlign: 'center', cursor: 'pointer',
                   bgcolor: poFile ? 'success.50' : 'grey.50',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                  height: '110px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.25s ease',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50', transform: 'translateY(-2px)' }
                 }}>
                   {poFile ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 18 }} />
-                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap>{poFile.name}</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 24 }} />
+                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: 160 }}>{poFile.name}</Typography>
                     </Box>
                   ) : (
                     <>
-                      <CloudUploadIcon sx={{ fontSize: 24, color: 'text.disabled', mb: 0.5 }} />
-                      <Typography variant="caption" display="block" color="text.secondary">Upload PO Doc</Typography>
+                      <CloudUploadIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 0.5 }} />
+                      <Typography variant="caption" fontWeight={600} color="text.secondary">Upload PO Doc</Typography>
                     </>
                   )}
                 </Box>
@@ -220,27 +191,32 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
             </Grid>
 
             <Grid item xs={12} sm={4}>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.75 }}>
+              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
                 Bilty Attach
               </Typography>
               <input accept="image/*,.pdf" style={{ display: 'none' }} id="bilty-file-upload" type="file" onChange={(e) => handleFileChange(e, 'bilty')} />
               <label htmlFor="bilty-file-upload">
                 <Box sx={{
                   border: '2px dashed', borderColor: biltyFile ? 'success.main' : 'divider',
-                  borderRadius: 2, p: 2, textAlign: 'center', cursor: 'pointer',
+                  borderRadius: 3, p: 3, textAlign: 'center', cursor: 'pointer',
                   bgcolor: biltyFile ? 'success.50' : 'grey.50',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                  height: '110px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.25s ease',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50', transform: 'translateY(-2px)' }
                 }}>
                   {biltyFile ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 18 }} />
-                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap>{biltyFile.name}</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 24 }} />
+                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: 160 }}>{biltyFile.name}</Typography>
                     </Box>
                   ) : (
                     <>
-                      <CloudUploadIcon sx={{ fontSize: 24, color: 'text.disabled', mb: 0.5 }} />
-                      <Typography variant="caption" display="block" color="text.secondary">Upload Bilty Doc</Typography>
+                      <CloudUploadIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 0.5 }} />
+                      <Typography variant="caption" fontWeight={600} color="text.secondary">Upload Bilty Doc</Typography>
                     </>
                   )}
                 </Box>
@@ -248,27 +224,32 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
             </Grid>
 
             <Grid item xs={12} sm={4}>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.75 }}>
+              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
                 Invoice Attach
               </Typography>
               <input accept="image/*,.pdf" style={{ display: 'none' }} id="invoice-file-upload" type="file" onChange={(e) => handleFileChange(e, 'invoice')} />
               <label htmlFor="invoice-file-upload">
                 <Box sx={{
                   border: '2px dashed', borderColor: invoiceFile ? 'success.main' : 'divider',
-                  borderRadius: 2, p: 2, textAlign: 'center', cursor: 'pointer',
+                  borderRadius: 3, p: 3, textAlign: 'center', cursor: 'pointer',
                   bgcolor: invoiceFile ? 'success.50' : 'grey.50',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                  height: '110px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.25s ease',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50', transform: 'translateY(-2px)' }
                 }}>
                   {invoiceFile ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 18 }} />
-                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap>{invoiceFile.name}</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 24 }} />
+                      <Typography variant="caption" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: 160 }}>{invoiceFile.name}</Typography>
                     </Box>
                   ) : (
                     <>
-                      <CloudUploadIcon sx={{ fontSize: 24, color: 'text.disabled', mb: 0.5 }} />
-                      <Typography variant="caption" display="block" color="text.secondary">Upload Invoice</Typography>
+                      <CloudUploadIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 0.5 }} />
+                      <Typography variant="caption" fontWeight={600} color="text.secondary">Upload Invoice</Typography>
                     </>
                   )}
                 </Box>
@@ -279,8 +260,8 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
 
         {/* ── Footer ── */}
         <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38 }} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" form="tally-form" variant="contained" color="secondary" sx={{ minWidth: 150, height: 38 }} disabled={isSubmitting}>
+          <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38, borderRadius: 2 }} disabled={isSubmitting}>Cancel</Button>
+          <Button type="submit" form="tally-form" variant="contained" color="secondary" sx={{ minWidth: 150, height: 38, borderRadius: 2 }} disabled={isSubmitting}>
             {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'Confirm & Save'}
           </Button>
         </DialogActions>

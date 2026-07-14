@@ -72,14 +72,34 @@ export default function TallyEntryPage() {
   const [poViewRecord,   setPoViewRecord]   = useState(null);
 
   const stageRecords = useMemo(() => {
-    const recs = tabValue === 0
-      ? records.filter(r => r.workflowStage.tallyEntry === 'Pending')
-      : records.filter(r => r.workflowStage.tallyEntry === 'Completed');
+    const recs = records.filter(r => {
+      const planned3 = r.tallyPlanned && String(r.tallyPlanned).trim() !== "";
+      const actual3 = r.tallyActual && String(r.tallyActual).trim() !== "";
+
+      if (tabValue === 0) {
+        return planned3 && !actual3;
+      } else {
+        return planned3 && actual3;
+      }
+    });
     return groupByPO(recs);
   }, [records, tabValue]);
 
-  const pendingCount = useMemo(() => groupByPO(records.filter(r => r.workflowStage.tallyEntry === 'Pending')).length, [records]);
-  const historyCount = useMemo(() => groupByPO(records.filter(r => r.workflowStage.tallyEntry === 'Completed')).length, [records]);
+  const pendingCount = useMemo(() => {
+    return groupByPO(records.filter(r => {
+      const planned3 = r.tallyPlanned && String(r.tallyPlanned).trim() !== "";
+      const actual3 = r.tallyActual && String(r.tallyActual).trim() !== "";
+      return planned3 && !actual3;
+    })).length;
+  }, [records]);
+
+  const historyCount = useMemo(() => {
+    return groupByPO(records.filter(r => {
+      const planned3 = r.tallyPlanned && String(r.tallyPlanned).trim() !== "";
+      const actual3 = r.tallyActual && String(r.tallyActual).trim() !== "";
+      return planned3 && actual3;
+    })).length;
+  }, [records]);
 
   const filtered = useMemo(() =>
     stageRecords.filter((i) => {

@@ -39,6 +39,7 @@ const getHistoryCols = (onViewPO) => [
       </Link>
     ) : '—',
   },
+  { key: 'liftRemarks', label: 'Remarks', minWidth: 180 },
 ];
 
 export default function LiftReceiverPage() {
@@ -52,9 +53,16 @@ export default function LiftReceiverPage() {
   const [poViewRecord,  setPoViewRecord]  = useState(null);
 
   const stageRecords = useMemo(() => {
-    const recs = tabValue === 0
-      ? records.filter(r => r.workflowStage.liftReceiver === 'Pending')
-      : records.filter(r => r.workflowStage.liftReceiver === 'Completed');
+    const recs = records.filter(r => {
+      const planned2 = r.liftPlanned && String(r.liftPlanned).trim() !== "";
+      const actual2 = r.liftActual && String(r.liftActual).trim() !== "";
+
+      if (tabValue === 0) {
+        return planned2 && !actual2;
+      } else {
+        return planned2 && actual2;
+      }
+    });
     return groupByPO(recs);
   }, [records, tabValue]);
 

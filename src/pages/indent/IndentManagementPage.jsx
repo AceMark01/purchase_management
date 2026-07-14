@@ -309,13 +309,16 @@ export default function IndentManagementPage() {
         item.description || "",
         Number(item.quantity) || 0,
         item.unit,
-        Number(item.rate) || 0,
-        Number(item.gst) || 0,
-        Number(item.discount) || 0,
+        String(item.rate || 0),
+        String(item.gst || 0),
+        String(item.discount || 0),
         imageUrl || "",
         Number(item.leadDays) || 0,
         data.companyName
       ]);
+
+      console.log("[DEBUG] Frontend received form data:", { data, activeItems });
+      console.log("[DEBUG] Frontend is sending rowsData to Backend:", rowsData);
 
       // Ensure that row 6 (header row) has a value in column A. 
       // The backend's getActualLastRow scans column A to determine where to append.

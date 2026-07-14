@@ -171,87 +171,15 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
 
         const generatedLiftNumber = result.liftNumber;
 
-        // 3. Upload Bill and submit to RECEIVED-ACCOUNTS
-        let billImageUrl = '';
-        if (billFile && folderId) {
-          try {
-            const base64Data = await fileToBase64(billFile);
-            const uploadRes = await gasApi.uploadFile({
-              base64Data,
-              fileName: billFile.name,
-              mimeType: billFile.type,
-              folderId,
-            });
-            if (uploadRes.success) {
-              billImageUrl = uploadRes.fileUrl;
-            }
-          } catch (err) {
-            console.error("Failed to upload Bill image:", err);
-            toast.warning("Failed to upload Bill image to Google Drive, proceeding without upload.");
-          }
-        }
-
-        const receivingHeaders = headers?.receiving || [
-          "Timestamp",
-          "Lift No.",
-          "Indent No.",
-          "Party Name",
-          "Product Name",
-          "Qty",
-          "Product Name2",
-          "Qty2",
-          "Product Name3",
-          "Qty3",
-          "Product Name4",
-          "Qty4",
-          "Product Name5",
-          "Qty5",
-          "Bill No.",
-          "Quality Check",
-          "Bill Image",
-          "lift Status",
-          "Status"
-        ];
-
-        const receivingRows = matchedRecords.map(rec => {
-          const itemQty = matchedRecords.length === 1 ? Number(data.quantity) : rec.quantity;
-          const rowObj = {
-            "Timestamp": timestamp,
-            "Lift No.": generatedLiftNumber,
-            "Indent No.": rec.indentNumber,
-            "Party Name": rec.partyName,
-            "Product Name": rec.itemName,
-            "Qty": itemQty,
-            "Product Name2": "",
-            "Qty2": "",
-            "Product Name3": "",
-            "Qty3": "",
-            "Product Name4": "",
-            "Qty4": "",
-            "Product Name5": "",
-            "Qty5": "",
-            "Bill No.": data.billNo,
-            "Quality Check": data.qualityCondition,
-            "Bill Image": billImageUrl || (billFile ? billFile.name : ''),
-            "lift Status": "Pending",
-            "Status": "Pending"
-          };
-          return receivingHeaders.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
-        });
-
-        const recResult = await gasApi.batchInsert("RECEIVED-ACCOUNTS", receivingRows);
-        if (!recResult.success) {
-          throw new Error(recResult.error || "Receiving batch insert failed");
-        }
-
-        // Update Actual2 in INDENT-PO
+        // Update Actual2 and Actual3 in INDENT-PO
         for (const rec of matchedRecords) {
           await updateRow('indents', rec.id, {
-            "Actual2": timestamp
+            "Actual2": timestamp,
+            "Actual3": timestamp
           }, false);
         }
 
-        toast.success(`Direct Receiving completed! Lift Number ${generatedLiftNumber} generated and received.`);
+        toast.success(`Direct Receiving completed! Lift Number ${generatedLiftNumber} generated.`);
       } else {
         // Other statuses (Arrange Logistics, Further Follow Up, Cancel): submit to Flw-up sheet
         const headersList = headers?.followUps || [

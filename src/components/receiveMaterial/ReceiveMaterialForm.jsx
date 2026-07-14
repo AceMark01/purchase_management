@@ -241,8 +241,8 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           "Bill No.": data.billNo,
           "Quality Check": data.qualityCondition,
           "Bill Image": billImageUrl || (billFile ? billFile.name : ''),
-          "lift Status": "Pending",
-          "Status": "Pending"
+          "lift Status": "",
+          "Status": ""
         };
         return receivingHeaders.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
       });

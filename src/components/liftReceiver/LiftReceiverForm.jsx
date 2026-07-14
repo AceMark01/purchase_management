@@ -29,8 +29,6 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
   
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
     defaultValues: {
-      status: 'Completed',
-      plannedDateTime: '',
       receiverImage: null,
       remarks: '',
     }
@@ -86,23 +84,29 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
 
     try {
       const actualTime = new Date();
-      const plannedTime = new Date(data.plannedDateTime);
-      const diffMs = actualTime - plannedTime;
-      const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
-      const hh = Math.floor(totalSeconds / 3600);
-      const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const ss = (totalSeconds % 60).toString().padStart(2, '0');
-      const timeDelay = `${hh}:${mm}:${ss}`;
-
       let updatedCount = 0;
       for (const rec of matchedRecords) {
         if (rec._receivingRow) {
+          const recPlannedStr = rec.liftPlanned ? String(rec.liftPlanned).trim().replace(' ', 'T') : '';
+          let timeDelay = '00:00:00';
+          if (recPlannedStr) {
+            const recPlannedTime = new Date(recPlannedStr);
+            if (!isNaN(recPlannedTime.getTime())) {
+              const diffMs = actualTime - recPlannedTime;
+              const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
+              const hh = Math.floor(totalSeconds / 3600);
+              const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+              const ss = (totalSeconds % 60).toString().padStart(2, '0');
+              timeDelay = `${hh}:${mm}:${ss}`;
+            }
+          }
+
           await updateRow('receiving', rec._receivingRow, {
-            "Planned 2": formatTimestamp(data.plannedDateTime),
             "Actual 2": formatTimestamp(actualTime),
             "Time Delay 2": timeDelay,
-            "lift Status": data.status,
-            "Lifted Image": receiverImageUrl || (receiverFile ? receiverFile.name : '')
+            "lift Status": "Completed",
+            "Lifted Image": receiverImageUrl || (receiverFile ? receiverFile.name : ''),
+            "Remarks": data.remarks || ""
           });
           updatedCount++;
         }
@@ -132,17 +136,18 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
       maxWidth={false}
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 4,
           width: '720px',
           maxWidth: '96vw',
           maxHeight: '92vh',
+          boxShadow: '0px 20px 40px rgba(0,0,0,0.1)'
         }
       }}
     >
       {/* ── Header ── */}
       <DialogTitle sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'warning.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: 'warning.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <MoveToInboxIcon sx={{ color: 'warning.main', fontSize: 20 }} />
           </Box>
           <Box>
@@ -156,75 +161,60 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
       </DialogTitle>
 
       <Box component="form" id="receiver-form" onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent sx={{ px: 3, py: 2.5, overflowY: 'auto' }}>
+        <DialogContent sx={{ px: 3, py: 3, overflowY: 'auto' }}>
+          
+          <Grid container spacing={3}>
+            {/* Left Column: Image Upload */}
+            <Grid item xs={12} md={6}>
+              <SectionLabel>Lifted Image</SectionLabel>
+              <input accept="image/*" style={{ display: 'none' }} id="receiver-image-upload" type="file" onChange={handleFileChange} />
+              <label htmlFor="receiver-image-upload">
+                <Box sx={{
+                  border: '2px dashed', borderColor: receiverImageFile ? 'success.main' : 'divider',
+                  borderRadius: 3, p: 4, height: '170px', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  bgcolor: receiverImageFile ? 'success.50' : 'grey.50',
+                  transition: 'all 0.25s ease',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50', transform: 'translateY(-2px)' }
+                }}>
+                  {receiverImageFile ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 32 }} />
+                      <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: 220 }}>
+                        {receiverImageFile.name}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <CloudUploadIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+                      <Typography variant="body2" color="text.secondary" fontWeight={600}>Upload Lifted Image</Typography>
+                      <Typography variant="caption" color="text.disabled">JPG, PNG accepted</Typography>
+                    </>
+                  )}
+                </Box>
+              </label>
+            </Grid>
 
-          {/* Section 1: Verification Status */}
-          <SectionLabel>Verification Status</SectionLabel>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
+            {/* Right Column: Remarks */}
+            <Grid item xs={12} md={6}>
+              <SectionLabel>Remarks</SectionLabel>
               <TextField
-                select fullWidth size="small" label="Confirmation Status *"
-                defaultValue="Completed"
-                {...register('status', { required: 'Status is required' })}
-                error={!!errors.status} helperText={errors.status?.message}
-                SelectProps={{ MenuProps: { PaperProps: { sx: { minWidth: 220 } } } }}
-              >
-                <MenuItem value="Completed">Completed</MenuItem>
-                <MenuItem value="Not Completed">Not Completed</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth size="small" label="Planned DateTime *"
-                type="datetime-local"
-                InputLabelProps={{ shrink: true }}
-                {...register('plannedDateTime', { required: 'Planned DateTime is required' })}
-                error={!!errors.plannedDateTime} helperText={errors.plannedDateTime?.message}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth size="small" label="Remarks" multiline rows={3}
-                placeholder="Any observations or notes about the lift receiver process..."
+                fullWidth size="small" multiline rows={7}
+                placeholder="Enter any observations, notes, or details about the lifted material..."
                 {...register('remarks')}
+                InputProps={{
+                  sx: { borderRadius: 3, bgcolor: 'background.paper' }
+                }}
               />
             </Grid>
           </Grid>
-
-          <Divider sx={{ mb: 2.5 }} />
-
-          {/* Section 2: Document Upload */}
-          <SectionLabel>Receiver Image / Document</SectionLabel>
-          <input accept="image/*" style={{ display: 'none' }} id="receiver-image-upload" type="file" onChange={handleFileChange} />
-          <label htmlFor="receiver-image-upload">
-            <Box sx={{
-              border: '2px dashed', borderColor: receiverImageFile ? 'success.main' : 'divider',
-              borderRadius: 2, p: 3, textAlign: 'center', cursor: 'pointer',
-              bgcolor: receiverImageFile ? 'success.50' : 'grey.50',
-              transition: 'all 0.2s ease',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
-            }}>
-              {receiverImageFile ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                  <CheckCircleOutlineIcon sx={{ color: 'success.main' }} />
-                  <Typography variant="body2" fontWeight={600} color="success.main">{receiverImageFile.name}</Typography>
-                </Box>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 0.5 }} />
-                  <Typography variant="body2" color="text.secondary" fontWeight={500}>Click to upload Receiver Image</Typography>
-                  <Typography variant="caption" color="text.disabled">JPG, PNG accepted</Typography>
-                </>
-              )}
-            </Box>
-          </label>
 
         </DialogContent>
 
         {/* ── Footer ── */}
         <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38 }}>Cancel</Button>
-          <Button type="submit" form="receiver-form" variant="contained" color="warning" disabled={isSubmitting} sx={{ minWidth: 150, height: 38, color: 'white' }}>
+          <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38, borderRadius: 2 }}>Cancel</Button>
+          <Button type="submit" form="receiver-form" variant="contained" color="warning" disabled={isSubmitting} sx={{ minWidth: 150, height: 38, color: 'white', borderRadius: 2 }}>
             {isSubmitting ? 'Saving...' : 'Save & Submit'}
           </Button>
         </DialogActions>

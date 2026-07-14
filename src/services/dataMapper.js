@@ -531,6 +531,7 @@ export function mapWorkflowRecords(
       baseRecord.liftActual = receive["Actual 2"] || "";
       baseRecord.liftTimeDelay = receive["Time Delay 2"] || "";
       baseRecord.liftedImage = receive["Lifted Image"] || null;
+      baseRecord.liftRemarks = receive["Remarks"] || "";
 
       baseRecord.tallyStatus = receive["Status"] || "";
       baseRecord.tallyPlanned = receive["Planned 3"] || "";
