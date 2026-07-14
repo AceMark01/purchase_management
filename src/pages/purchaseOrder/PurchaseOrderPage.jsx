@@ -59,7 +59,7 @@ const getHistoryColumns = (onViewPDF) => [
         <Chip label="N/A" size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
       ),
   },
-  ...WORKFLOW_COLUMNS,
+  ...WORKFLOW_COLUMNS.filter(col => col.key !== 'orderBy' && col.key !== 'leadDays' && col.key !== 'image'),
 ];
 
 export default function PurchaseOrderPage() {
