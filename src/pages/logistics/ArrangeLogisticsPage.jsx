@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useSelector }                     from 'react-redux';
-import { Box, Button, Link }               from '@mui/material';
+import { Box, Button, Link, Chip }         from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import OpenInNewIcon     from '@mui/icons-material/OpenInNew';
 import { ViewBtn }       from '../../components/common/ActionButtons';
@@ -58,7 +58,49 @@ export default function ArrangeLogisticsPage() {
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
 
-  const historyCols = useMemo(() => getHistoryCols(handleViewPO), []);
+  const indentCol = useMemo(() => ({
+    key: 'indentNumber',
+    label: 'Indent Number',
+    minWidth: 150,
+    render: (_v, row) => {
+      const vals = row._indentNumbers || (row.indentNumber ? [row.indentNumber] : []);
+      if (!vals.length) return '—';
+      return vals.map(num => (
+        <Chip 
+          key={num} 
+          label={num} 
+          size="small" 
+          color="primary" 
+          sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, mr: 0.5, mb: 0.5 }} 
+        />
+      ));
+    }
+  }), []);
+
+  const serialCol = useMemo(() => ({
+    key: 'serialNo',
+    label: 'Serial No.',
+    minWidth: 100,
+    render: (_v, row) => {
+      const vals = row._serialNos || (row.serialNo !== undefined && row.serialNo !== null && row.serialNo !== '' ? [row.serialNo] : []);
+      return vals.length ? vals.join(', ') : '—';
+    }
+  }), []);
+
+  const liftCol = useMemo(() => ({
+    key: 'liftNo',
+    label: 'Lift No.',
+    minWidth: 120,
+    render: (v) => v || '—'
+  }), []);
+
+  const pendingCols = useMemo(() => {
+    return [indentCol, serialCol, ...PO_COLUMNS];
+  }, [indentCol, serialCol]);
+
+  const historyCols = useMemo(() => {
+    return [indentCol, liftCol, ...getHistoryCols(handleViewPO)];
+  }, [handleViewPO, indentCol, liftCol]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {
@@ -66,8 +108,8 @@ export default function ArrangeLogisticsPage() {
         <Button key="logistics" size="small" variant="contained" color="success"
           startIcon={<LocalShippingIcon />}
           onClick={() => { setSelectedRow(row); setLogisticsOpen(true); }}
-          sx={{ minWidth: 175, fontSize: '0.7rem' }}>
-          Arrange &amp; Get Lifting
+          sx={{ minWidth: 130, fontSize: '0.7rem', px: 1.5 }}>
+          Arrange Logistics
         </Button>
       ];
     }
@@ -85,7 +127,7 @@ export default function ArrangeLogisticsPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : PO_COLUMNS}
+        columns={tabValue === 1 ? historyCols : pendingCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending — Logistics & Lifting' : 'History — Logistics & Lifting'}
         searchKey={['poNumber', 'partyName', 'companyName']}

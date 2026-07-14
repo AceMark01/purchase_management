@@ -90,8 +90,11 @@ const SHEET_MAP = {
   "poHistory": "PO-History"
 };
 
-const getHeaderRow = (grid) => {
+const getHeaderRow = (grid, sheetName = "") => {
   if (!grid || grid.length === 0) return [];
+  if (sheetName === "INDENT-PO") {
+    return (grid[5] || []).map(h => String(h || "").trim());
+  }
   for (let i = 0; i < Math.min(grid.length, 10); i++) {
     const row = grid[i];
     if (Array.isArray(row) && row.some(cell => {
@@ -144,7 +147,7 @@ const raw2DArrayToObjects = (grid, sheetName = "") => {
       continue;
     }
     // _row is the physical 1-based row index in spreadsheet (i + 1)
-    const obj = { _row: i + 1 };
+    const obj = { _row: i + 1, _rawRow: row };
     for (let j = 0; j < uniqueHeaders.length; j++) {
       const header = uniqueHeaders[j];
       if (header) {
@@ -265,7 +268,7 @@ export function DataProvider({ children }) {
       if (fetchedData.poHistory !== undefined || !sheetsToFetch) setRawPoHistory(poHistoryRaw);
 
       const headersMap = {
-        indents: getHeaderRow(indentsRaw),
+        indents: getHeaderRow(indentsRaw, "INDENT-PO"),
         approvals: getHeaderRow(approvalsRaw),
         followUps: getHeaderRow(followUpsRaw),
         logistics: getHeaderRow(logisticsRaw),
@@ -629,7 +632,11 @@ export function DataProvider({ children }) {
         if (colName.startsWith("col-")) {
           absoluteColIdx = parseInt(colName.replace("col-", ""), 10);
         } else {
-          const colIdx = headers.indexOf(colName) + 1;
+          let colIdx = headers.indexOf(colName) + 1;
+          if (colIdx <= 0) {
+            const normCol = colName.replace(/\s+/g, "").toLowerCase();
+            colIdx = headers.findIndex(h => String(h || "").replace(/\s+/g, "").toLowerCase() === normCol) + 1;
+          }
           if (colIdx > 0) {
             absoluteColIdx = colIdx + colOffset;
           }

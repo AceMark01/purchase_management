@@ -386,8 +386,42 @@ export function mapWorkflowRecords(
     }
 
     // Logistics & Lifting Stage
+    let planned3 = "";
+    let actual3 = "";
+    let timeDelay3 = "";
+    if (row._rawRow) {
+      planned3 = row._rawRow[48] || "";
+      actual3 = row._rawRow[49] || "";
+      timeDelay3 = row._rawRow[50] || "";
+    }
+    for (const key in row) {
+      if (key === "_rawRow") continue;
+      const normalizedKey = key.replace(/\s+/g, "").toLowerCase();
+      if (normalizedKey === "planned3") {
+        planned3 = row[key] || planned3;
+      } else if (normalizedKey === "actual3") {
+        actual3 = row[key] || actual3;
+      } else if (normalizedKey === "timedelay3") {
+        timeDelay3 = row[key] || timeDelay3;
+      }
+    }
+
+    baseRecord.planned3 = planned3;
+    baseRecord.actual3 = actual3;
+    baseRecord.timeDelay3 = timeDelay3;
+
+    if (planned3 && String(planned3).trim() !== "") {
+      if (!actual3 || String(actual3).trim() === "") {
+        baseRecord.workflowStage.logistics = 'Pending';
+      } else {
+        baseRecord.workflowStage.logistics = 'Completed';
+      }
+    }
+
     if (logistic) {
-      baseRecord.workflowStage.logistics = 'Completed';
+      if (baseRecord.workflowStage.logistics !== 'Pending') {
+        baseRecord.workflowStage.logistics = 'Completed';
+      }
       baseRecord.workflowStage.receiveMaterial = 'Pending';
       baseRecord.liftNo = logistic["LN-Lift Number"] || logistic["LN-Lift Number "] || "";
       baseRecord.transporterName = logistic["Transporter Name"] || "";

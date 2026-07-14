@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  TextField, Box, Typography, IconButton, Grid, InputAdornment, Divider, Chip
+  TextField, Box, Typography, IconButton, Grid, InputAdornment, Divider
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -24,17 +24,16 @@ const SectionLabel = ({ children }) => (
 export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }) {
   const dispatch = useDispatch();
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, headers } = useData();
+  const { refresh, updateRow, headers } = useData();
   const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
     defaultValues: {
       transporterName: '',
-      partyAddress: record?.partyAddress || '',
-      locationLink: record?.locationLink || '',
+      partyAddress: '',
+      locationLink: '',
       vehicleNo: '',
-      driverName: '',
       driverNo: '',
       biltyNo: '',
       biltyImage: null,
@@ -43,6 +42,21 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
   });
 
   const biltyImageFile = watch('biltyImage');
+
+  useEffect(() => {
+    if (open && record) {
+      setValue('partyAddress', record.partyAddress || '');
+      setValue('locationLink', record.locationLink || '');
+      setValue('transporterName', '');
+      setValue('vehicleNo', '');
+      setValue('driverNo', '');
+      setValue('biltyNo', '');
+      setValue('biltyImage', null);
+      setValue('transportingAmount', '');
+      setBiltyFile(null);
+      setIsSubmitting(false);
+    }
+  }, [open, record, setValue]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -121,15 +135,23 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
           "Party Address": data.partyAddress,
           "Party Location Link": data.locationLink,
         };
-        // Map dynamically to ensure column alignment matches sheet
         return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
       });
 
       const result = await gasApi.batchInsertLogistics("LIFT-RECEIVED", rowsData);
-      if (result.success) {
+      if (result.success && result.liftNumber) {
+        // Update Actual3 in INDENT-PO
+        for (const rec of matchedRecords) {
+          await updateRow('indents', rec.id, {
+            "Actual3": timestamp
+          }, false);
+        }
+
         toast.success(`Logistics arranged! Lift Number ${result.liftNumber} generated.`);
-        await refresh();
+        await refresh(['indents'], false);
         onClose();
+      } else {
+        throw new Error(result.error || "Logistics batch insert failed");
       }
     } catch (err) {
       console.error("Failed to save logistics:", err);
@@ -140,29 +162,18 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth={false}
-      PaperProps={{
-        sx: {
-          borderRadius: 3,
-          width: '820px',
-          maxWidth: '96vw',
-          maxHeight: '92vh',
-        }
-      }}
-    >
-      {/* ── Header ── */}
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh' } }}>
+
       <DialogTitle sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'success.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LocalShippingIcon sx={{ color: 'success.main', fontSize: 20 }} />
-          </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Arrange Logistics & Get Lifting</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Arrange Logistics</Typography>
             {record && (
-              <Typography variant="caption" color="text.secondary">Indent: {record.indentNumber} &nbsp;·&nbsp; {record.itemName}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {record.poNumber} · {record.partyName}
+                {(groupIds?.length || 0) > 1 ? ` · ${groupIds.length} items` : ''}
+              </Typography>
             )}
           </Box>
         </Box>
@@ -171,90 +182,98 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
 
       <Box component="form" id="logistics-form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent sx={{ px: 3, py: 2.5, overflowY: 'auto' }}>
+          <SectionLabel>Logistics Details</SectionLabel>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Grid container spacing={2.5}>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Transporter Name <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small"
+                  {...register('transporterName', { required: 'Required' })}
+                  error={!!errors.transporterName} helperText={errors.transporterName?.message} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Vehicle No. <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small"
+                  {...register('vehicleNo', { required: 'Required' })}
+                  error={!!errors.vehicleNo} helperText={errors.vehicleNo?.message} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Driver No. <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small" type="tel"
+                  {...register('driverNo', { required: 'Required' })}
+                  error={!!errors.driverNo} helperText={errors.driverNo?.message} />
+              </Grid>
 
-          {/* Section 1: Transporter Details */}
-          <SectionLabel>Transporter Details</SectionLabel>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Transporter Name *"
-                {...register('transporterName', { required: 'Required' })}
-                error={!!errors.transporterName} helperText={errors.transporterName?.message} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Vehicle No. *"
-                {...register('vehicleNo', { required: 'Required' })}
-                error={!!errors.vehicleNo} helperText={errors.vehicleNo?.message} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Driver Name *"
-                {...register('driverName', { required: 'Required' })}
-                error={!!errors.driverName} helperText={errors.driverName?.message} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Driver Contact No. *" type="tel"
-                {...register('driverNo', { required: 'Required' })}
-                error={!!errors.driverNo} helperText={errors.driverNo?.message} />
-            </Grid>
-          </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Bilty No. <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small"
+                  {...register('biltyNo', { required: 'Required' })}
+                  error={!!errors.biltyNo} helperText={errors.biltyNo?.message} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Transporting Amount
+                </Typography>
+                <TextField fullWidth size="small" type="number"
+                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                  {...register('transportingAmount')} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Party Location Link
+                </Typography>
+                <TextField fullWidth size="small"
+                  {...register('locationLink')} />
+              </Grid>
 
-          <Divider sx={{ mb: 2.5 }} />
-
-          {/* Section 2: Shipment Details */}
-          <SectionLabel>Shipment Details</SectionLabel>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Bilty No. *"
-                {...register('biltyNo', { required: 'Required' })}
-                error={!!errors.biltyNo} helperText={errors.biltyNo?.message} />
+              <Grid item xs={8}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Party Address <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small" multiline rows={2}
+                  {...register('partyAddress', { required: 'Required' })}
+                  error={!!errors.partyAddress} helperText={errors.partyAddress?.message} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Bilty Image (Optional)
+                </Typography>
+                <input accept="image/*,.pdf" style={{ display: 'none' }} id="arrange-bilty-upload" type="file" onChange={handleFileChange} />
+                <label htmlFor="arrange-bilty-upload">
+                  <Box sx={{
+                    border: '2px dashed', borderColor: biltyImageFile ? 'success.main' : 'divider',
+                    borderRadius: 2, p: 1, textAlign: 'center', cursor: 'pointer',
+                    bgcolor: biltyImageFile ? 'success.50' : 'grey.50',
+                    height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                  }}>
+                    {biltyImageFile ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                        <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 20 }} />
+                        <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: '100px' }}>{biltyImageFile.name}</Typography>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CloudUploadIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
+                        <Typography variant="body2" color="text.secondary" fontWeight={500}>Upload Bilty</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </label>
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth size="small" label="Transporting Amount"
-                type="number"
-                InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-                {...register('transportingAmount')} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth size="small" label="Party Address *" multiline rows={2}
-                {...register('partyAddress', { required: 'Required' })}
-                error={!!errors.partyAddress} helperText={errors.partyAddress?.message} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth size="small" label="Location Link (Google Maps URL)"
-                {...register('locationLink')} />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ mb: 2.5 }} />
-
-          {/* Section 3: Document Upload */}
-          <SectionLabel>Bilty Document</SectionLabel>
-          <input accept="image/*,.pdf" style={{ display: 'none' }} id="bilty-file-upload" type="file" onChange={handleFileChange} />
-          <label htmlFor="bilty-file-upload">
-            <Box sx={{
-              border: '2px dashed', borderColor: biltyImageFile ? 'success.main' : 'divider',
-              borderRadius: 2, p: 2.5, textAlign: 'center', cursor: 'pointer',
-              bgcolor: biltyImageFile ? 'success.50' : 'grey.50',
-              transition: 'all 0.2s ease',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
-            }}>
-              {biltyImageFile ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                  <CheckCircleOutlineIcon sx={{ color: 'success.main' }} />
-                  <Typography variant="body2" fontWeight={600} color="success.main">{biltyImageFile.name}</Typography>
-                </Box>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 0.5 }} />
-                  <Typography variant="body2" color="text.secondary" fontWeight={500}>Click to upload Bilty Image</Typography>
-                  <Typography variant="caption" color="text.disabled">JPG, PNG, PDF accepted</Typography>
-                </>
-              )}
-            </Box>
-          </label>
-
+          </Box>
         </DialogContent>
 
-        {/* ── Footer ── */}
         <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', gap: 1 }}>
           <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38 }}>Cancel</Button>
           <Button type="submit" form="logistics-form" variant="contained" color="success" disabled={isSubmitting} sx={{ minWidth: 150, height: 38 }}>
