@@ -475,7 +475,8 @@ export function DataProvider({ children }) {
         const rate = parseNum(row["Rate"]);
         const gst = parseNum(row["GST %"] || row["GST"] || row["Gst %"]);
         const discount = parseNum(row["Discount Amount"] || row["Discount"] || row["Discount%"]);
-        const amount = (qty * rate * (1 + gst / 100)) - discount;
+        const afterDiscount = qty * rate * (1 - discount / 100);
+        const amount = afterDiscount * (1 + gst / 100);
         
         const indentHeaders = headersMap.indents || [];
         const plannedKey = indentHeaders[17] || "Planned1";

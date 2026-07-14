@@ -245,9 +245,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       const r   = parseFloat(item.rate)     || 0;
       const d   = parseFloat(item.discount) || 0;
       const g   = parseFloat(item.gst)      || 0;
-      const base = q * r - d;
-      sub    += base;
-      gstAmt += base * (g / 100);
+      const afterDiscount = q * r * (1 - d / 100);
+      sub    += afterDiscount;
+      gstAmt += afterDiscount * (g / 100);
     });
     setTotals({ grandTotal: sub + gstAmt });
   }, [watchItems]);
@@ -322,9 +322,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
         const poGst = matchedFormItem ? parseFloat(matchedFormItem.gst) : indent.gst;
         
-        const baseAmount = poQty * poRate;
-        const discounted = baseAmount - poDiscount;
-        const total = discounted * (1 + poGst / 100);
+        const afterDiscount = poQty * poRate * (1 - poDiscount / 100);
+        const discounted = afterDiscount;
+        const total = afterDiscount * (1 + poGst / 100);
 
         historyRows.push([
           formatTimestamp(new Date()), // Timestamp (A)
@@ -337,7 +337,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           poQty,                       // Quntity (H)
           indent.unit || "",           // Unit (I)
           poRate,                      // Rate (J)
-          poDiscount,                  // Discount% (K)
+          poDiscount,                  // Discount% stored as percentage (K)
           poGst,                       // Gst % (L)
           discounted,                  // Amount (M)
           total,                       // Total Amount (N)
@@ -539,7 +539,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
                 <th style={{ width: '45px' }}>Qty</th>
                 <th style={{ width: '40px' }}>Unit</th>
                 <th style={{ width: '50px' }}>Rate</th>
-                <th style={{ width: '50px' }}>Discount<br />Amount</th>
+                <th style={{ width: '50px' }}>Discount<br />%</th>
                 <th style={{ width: '35px' }}>GST %</th>
                 <th style={{ width: '65px' }}>Amount</th>
               </tr>
@@ -550,8 +550,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
                 const r   = parseFloat(item.rate)     || 0;
                 const d   = parseFloat(item.discount) || 0;
                 const g   = parseFloat(item.gst)      || 0;
-                const amt = (q * r) - d;
-                const totalWithGst = amt + (amt * g / 100);
+                const afterDiscount = q * r * (1 - d / 100);
+                const totalWithGst = afterDiscount * (1 + g / 100);
                 return (
                   <tr key={idx}>
                     <td>{idx + 1}</td>
