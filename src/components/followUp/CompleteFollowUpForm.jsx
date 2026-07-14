@@ -103,42 +103,46 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
 
     setIsSubmitting(true);
     try {
-      // Other statuses (Direct Receiving, Arrange Logistics, Further Follow Up, Cancel): submit to Flw-up sheet
-      const headersList = headers?.followUps || [
-        "Timestamp",
-        "Indent No.",
-        "S-No.",
-        "Follow-up Status",
-        "Excepted Arrival Date",
-        "Remark",
-        "Follow Up By",
-        "Next Follow-up Date",
-        "Actual"
-      ];
+      if (data.followUpStatus === 'Direct Receiving') {
+        // 1. Upload Bilty image (if any)
+        let biltyImageUrl = '';
+        const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
 
-      const timestamp = formatTimestamp();
+        if (biltyFile && folderId) {
+          try {
+            const base64Data = await fileToBase64(biltyFile);
+            const uploadRes = await gasApi.uploadFile({
+              base64Data,
+              fileName: biltyFile.name,
+              mimeType: biltyFile.type,
+              folderId,
+            });
+            if (uploadRes.success) {
+              biltyImageUrl = uploadRes.fileUrl;
+            }
+          } catch (err) {
+            console.error("Failed to upload Bilty image:", err);
+            toast.warning("Failed to upload Bilty to Google Drive, proceeding without upload.");
+          }
+        }
 
-      const rowsData = matchedRecords.map(record => {
-        const rowObj = {
-          "Timestamp": timestamp,
-          "Indent No.": record.indentNumber,
-          "S-No.": record.serialNo,
-          "Follow-up Status": data.followUpStatus,
-          "Excepted Arrival Date": "",
-          "Remark": data.remarks,
-          "Follow Up By": data.followUpBy,
-          "Next Follow-up Date": (data.followUpStatus === 'Further Follow Up' || data.followUpStatus === 'Arrange Logistics' || data.followUpStatus === 'Direct Receiving') ? data.nextFollowDate : '',
-          "CodeNO": "",
-          "Actual": (data.followUpStatus === 'Further Follow Up' || data.followUpStatus === 'Arrange Logistics' || data.followUpStatus === 'Direct Receiving') ? "" : timestamp
-        };
-        return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
-      });
+        // 2. Submit to sheet 'LIFT-RECEIVED'
+        const logisticsHeaders = headers?.logistics || [
+          "Timestamp",
+          "LN-Lift Number",
+          "Indent No.",
+          "Party Name",
+          "Material Name",
+          "Transporter Name",
+          "Vehicle No.",
+          "Driver No.",
+          "Bilty No.",
+          "Bilty Image",
+          "Transporting Amount",
+          "Party Address",
+          "Party Location Link"
+        ];
 
-<<<<<<< HEAD
-      const result = await gasApi.batchInsert("Flw-up", rowsData);
-      if (!result.success) {
-        throw new Error(result.error || "Batch insert failed");
-=======
         const timestamp = formatTimestamp();
 
         const rowsData = matchedRecords.map(rec => {
@@ -299,19 +303,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
         }
 
         toast.success('Follow-up status recorded successfully!');
->>>>>>> 117019df1954f3b26efd9e6dfacefa57b70b3656
       }
-
-      // If user cancelled, also update the indent status in the main sheet
-      if (data.followUpStatus === 'Cancel') {
-        for (const record of matchedRecords) {
-          await updateRow('indents', record.id, {
-            "Order Cancel": "Cancel"
-          });
-        }
-      }
-
-      toast.success('Follow-up status recorded successfully!');
 
       await refresh();
       onClose();

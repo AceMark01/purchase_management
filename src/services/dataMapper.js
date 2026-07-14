@@ -499,11 +499,31 @@ export function mapWorkflowRecords(
       baseRecord.receiptImage = receive["Bill Image"] || null;
       baseRecord.grnNo = receive["GRN No."] || "";
 
-      if (liftStatus === 'Completed' || liftStatus === 'Received') {
-        baseRecord.workflowStage.liftReceiver = 'Completed';
-        baseRecord.workflowStage.tallyEntry = 'Pending';
+      // Lift Receiver columns (Planned 2 = Q, Actual 2 = R)
+      let planned2Rec = "";
+      let actual2Rec = "";
+      if (receive._rawRow) {
+        planned2Rec = receive._rawRow[16] || "";
+        actual2Rec = receive._rawRow[17] || "";
+      }
+      for (const key in receive) {
+        if (key === "_rawRow") continue;
+        const normalizedKey = key.replace(/\s+/g, "").toLowerCase();
+        if (normalizedKey === "planned2") {
+          planned2Rec = receive[key] || planned2Rec;
+        } else if (normalizedKey === "actual2") {
+          actual2Rec = receive[key] || actual2Rec;
+        }
+      }
+
+      if (planned2Rec && String(planned2Rec).trim() !== "") {
+        if (!actual2Rec || String(actual2Rec).trim() === "") {
+          baseRecord.workflowStage.liftReceiver = 'Pending';
+        } else {
+          baseRecord.workflowStage.liftReceiver = 'Completed';
+        }
       } else {
-        baseRecord.workflowStage.liftReceiver = 'Pending';
+        baseRecord.workflowStage.liftReceiver = null;
       }
 
       baseRecord.liftStatus = receive["lift Status"] || "";
@@ -520,9 +540,32 @@ export function mapWorkflowRecords(
       baseRecord.biltyAttach = receive["Bilty Attach"] || null;
       baseRecord.invoiceAttach = receive["Invoice Attach"] || null;
 
-      if (accountsStatus === 'Completed' || accountsStatus === 'Verified' || accountsStatus === 'Complete') {
-        baseRecord.workflowStage.tallyEntry = 'Completed';
-        baseRecord.status = 'Fully Completed';
+      // Tally Entry columns (Planned 3 = V, Actual 3 = W)
+      let planned3Rec = "";
+      let actual3Rec = "";
+      if (receive._rawRow) {
+        planned3Rec = receive._rawRow[21] || "";
+        actual3Rec = receive._rawRow[22] || "";
+      }
+      for (const key in receive) {
+        if (key === "_rawRow") continue;
+        const normalizedKey = key.replace(/\s+/g, "").toLowerCase();
+        if (normalizedKey === "planned3") {
+          planned3Rec = receive[key] || planned3Rec;
+        } else if (normalizedKey === "actual3") {
+          actual3Rec = receive[key] || actual3Rec;
+        }
+      }
+
+      if (planned3Rec && String(planned3Rec).trim() !== "") {
+        if (!actual3Rec || String(actual3Rec).trim() === "") {
+          baseRecord.workflowStage.tallyEntry = 'Pending';
+        } else {
+          baseRecord.workflowStage.tallyEntry = 'Completed';
+          baseRecord.status = 'Fully Completed';
+        }
+      } else {
+        baseRecord.workflowStage.tallyEntry = null;
       }
     }
 
