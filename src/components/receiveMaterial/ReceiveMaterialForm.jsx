@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  TextField, Box, Typography, IconButton, Grid, RadioGroup,
-  FormControlLabel, Radio, FormControl, FormLabel, Divider, CircularProgress
+  TextField, Box, Typography, IconButton, Grid, Divider, InputAdornment, MenuItem
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -12,7 +11,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
-import { generateLiftNumber, formatDate } from '../../utils/formatters';
+import { formatTimestamp } from '../../utils/formatters';
 import { toast } from 'react-toastify';
 
 const SectionLabel = ({ children }) => (
@@ -24,8 +23,9 @@ const SectionLabel = ({ children }) => (
 
 export default function ReceiveMaterialForm({ open, onClose, record, groupIds }) {
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { receiving, refresh, addRow, headers } = useData();
+  const { refresh, updateRow, headers } = useData();
   const [billFile, setBillFile] = useState(null);
+  const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { register, handleSubmit, formState: { errors }, watch, setValue, control } = useForm({
@@ -35,16 +35,57 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       billNo: '',
       billImage: null,
       qualityCondition: 'Good',
+      transporterName: '',
+      vehicleNo: '',
+      driverNo: '',
+      biltyNo: '',
+      biltyImage: null,
+      transportingAmount: '',
+      partyAddress: '',
+      locationLink: '',
     }
   });
 
   const billImageFile = watch('billImage');
+  const biltyImageFile = watch('biltyImage');
 
-  const handleFileChange = (e) => {
+  useEffect(() => {
+    if (open && record) {
+      setValue('productName', record.itemName || '');
+      setValue('quantity', record.quantity || '');
+      setValue('billNo', '');
+      setValue('billImage', null);
+      setValue('qualityCondition', 'Good');
+      setBillFile(null);
+
+      // Logistics default values
+      setValue('partyAddress', record.partyAddress || '');
+      setValue('locationLink', record.locationLink || '');
+      setValue('transporterName', '');
+      setValue('vehicleNo', '');
+      setValue('driverNo', '');
+      setValue('biltyNo', '');
+      setValue('biltyImage', null);
+      setValue('transportingAmount', '');
+      setBiltyFile(null);
+      
+      setIsSubmitting(false);
+    }
+  }, [open, record, setValue]);
+
+  const handleBillFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setBillFile(file);
       setValue('billImage', { name: file.name, url: URL.createObjectURL(file) });
+    }
+  };
+
+  const handleBiltyFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setBiltyFile(file);
+      setValue('biltyImage', { name: file.name, url: URL.createObjectURL(file) });
     }
   };
 
@@ -62,32 +103,53 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
 
     setIsSubmitting(true);
     let billImageUrl = '';
+    let biltyImageUrl = '';
     const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
 
-    if (billFile && folderId) {
-      try {
-        const base64Data = await fileToBase64(billFile);
-        const uploadRes = await gasApi.uploadFile({
-          base64Data,
-          fileName: billFile.name,
-          mimeType: billFile.type,
-          folderId,
-        });
-        if (uploadRes.success) {
-          billImageUrl = uploadRes.fileUrl;
+    if (folderId) {
+      if (billFile) {
+        try {
+          const base64Data = await fileToBase64(billFile);
+          const uploadRes = await gasApi.uploadFile({
+            base64Data,
+            fileName: billFile.name,
+            mimeType: billFile.type,
+            folderId,
+          });
+          if (uploadRes.success) {
+            billImageUrl = uploadRes.fileUrl;
+          }
+        } catch (err) {
+          console.error("Failed to upload bill image:", err);
+          toast.warning("Failed to upload bill image to Google Drive, proceeding without upload.");
         }
-      } catch (err) {
-        console.error("Failed to upload bill image:", err);
-        toast.warning("Failed to upload bill image to Google Drive, proceeding without upload.");
+      }
+
+      if (!record.liftNo && biltyFile) {
+        try {
+          const base64Data = await fileToBase64(biltyFile);
+          const uploadRes = await gasApi.uploadFile({
+            base64Data,
+            fileName: biltyFile.name,
+            mimeType: biltyFile.type,
+            folderId,
+          });
+          if (uploadRes.success) {
+            biltyImageUrl = uploadRes.fileUrl;
+          }
+        } catch (err) {
+          console.error("Failed to upload Bilty image:", err);
+          toast.warning("Failed to upload Bilty to Google Drive, proceeding without upload.");
+        }
       }
     }
 
     try {
-      let liftNo = record?.liftNo || record?.liftNumber;
+      let liftNo = record.liftNo || record.liftNumber;
+      const timestamp = formatTimestamp();
 
       if (!liftNo) {
-        // Direct receiving: Insert skeletal logistics row to generate unique lift number safely on backend
-        const timestamp = formatDate(new Date());
+        // Direct receiving: Insert logistics details to generate unique lift number safely on backend
         const headersList = headers?.logistics || [
           "Timestamp",
           "LN-Lift Number",
@@ -101,7 +163,10 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           "Bilty Image",
           "Transporting Amount",
           "Party Address",
-          "Party Location Link"
+          "Party Location Link",
+          "Planned 1",
+          "Actual 1",
+          "Time Delay 1"
         ];
 
         const logisticsRows = matchedRecords.map(rec => {
@@ -111,14 +176,17 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
             "Indent No.": rec.indentNumber,
             "Party Name": rec.partyName,
             "Material Name": rec.itemName,
-            "Transporter Name": "Direct Receiving",
-            "Vehicle No.": "Direct",
-            "Driver No.": "Direct",
-            "Bilty No.": "Direct",
-            "Bilty Image": "",
-            "Transporting Amount": 0,
-            "Party Address": "Direct",
-            "Party Location Link": ""
+            "Transporter Name": data.transporterName,
+            "Vehicle No.": data.vehicleNo,
+            "Driver No.": data.driverNo,
+            "Bilty No.": data.biltyNo,
+            "Bilty Image": biltyImageUrl || (biltyFile ? biltyFile.name : ''),
+            "Transporting Amount": Number(data.transportingAmount) || 0,
+            "Party Address": data.partyAddress,
+            "Party Location Link": data.locationLink,
+            "Planned 1": timestamp,
+            "Actual 1": timestamp,
+            "Time Delay 1": 0
           };
           return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
         });
@@ -131,10 +199,32 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       }
 
       // Loop sequentially to write each receiving row
-      for (const rec of matchedRecords) {
+      const receivingHeaders = headers?.receiving || [
+        "Timestamp",
+        "Lift No.",
+        "Indent No.",
+        "Party Name",
+        "Product Name",
+        "Qty",
+        "Product Name2",
+        "Qty2",
+        "Product Name3",
+        "Qty3",
+        "Product Name4",
+        "Qty4",
+        "Product Name5",
+        "Qty5",
+        "Bill No.",
+        "Quality Check",
+        "Bill Image",
+        "lift Status",
+        "Status"
+      ];
+
+      const receivingRows = matchedRecords.map(rec => {
         const itemQty = matchedRecords.length === 1 ? Number(data.quantity) : rec.quantity;
-        
-        await addRow("receiving", {
+        const rowObj = {
+          "Timestamp": timestamp,
           "Lift No.": liftNo,
           "Indent No.": rec.indentNumber,
           "Party Name": rec.partyName,
@@ -153,7 +243,22 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           "Bill Image": billImageUrl || (billFile ? billFile.name : ''),
           "lift Status": "Pending",
           "Status": "Pending"
-        });
+        };
+        return receivingHeaders.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
+      });
+
+      const recResult = await gasApi.batchInsert("RECEIVED-ACCOUNTS", receivingRows);
+      if (!recResult.success) {
+        throw new Error(recResult.error || "Receiving batch insert failed");
+      }
+
+      // Update Actual 1 in LIFT-RECEIVED if logistics row existed (arranged flow)
+      for (const rec of matchedRecords) {
+        if (rec._logisticsRow) {
+          await updateRow('logistics', rec._logisticsRow, {
+            "Actual 1": timestamp
+          }, false);
+        }
       }
 
       toast.success(`Material received! ${matchedRecords.length} item(s) moved to Lift Receiver.`);
@@ -168,20 +273,9 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth={false}
-      PaperProps={{
-        sx: {
-          borderRadius: 3,
-          width: '800px',
-          maxWidth: '96vw',
-          maxHeight: '92vh',
-        }
-      }}
-    >
-      {/* ── Header ── */}
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh' } }}>
+
       <DialogTitle sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'info.50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -199,95 +293,183 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
 
       <Box component="form" id="receive-form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent sx={{ px: 3, py: 2.5, overflowY: 'auto' }}>
-
-          {/* Section 1: Material Info */}
-          <SectionLabel>Material Information</SectionLabel>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, mb: 3 }}>
-            <Box>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                Product Name
-              </Typography>
-              <TextField fullWidth
-                value={record?.itemName || ''}
-                InputProps={{ readOnly: true }}
-                sx={{ bgcolor: 'action.hover', '& input': { color: 'text.secondary', fontWeight: 600 } }}
-              />
-            </Box>
-            <Box>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                Quantity <span style={{ color: 'red' }}>*</span>
-              </Typography>
-              <TextField fullWidth type="number"
-                {...register('quantity', { required: 'Required' })}
-                error={!!errors.quantity} helperText={errors.quantity?.message} />
-            </Box>
-          </Box>
-
-          <Divider sx={{ mb: 2.5 }} />
-
-          {/* Section 2: Bill & Quality */}
-          <SectionLabel>Bill & Quality Details</SectionLabel>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, mb: 3 }}>
-            <Box>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                Bill No. <span style={{ color: 'red' }}>*</span>
-              </Typography>
-              <TextField fullWidth
-                {...register('billNo', { required: 'Required' })}
-                error={!!errors.billNo} helperText={errors.billNo?.message} />
-            </Box>
-            <Box>
-              <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                Quality Condition <span style={{ color: 'red' }}>*</span>
-              </Typography>
-              <FormControl component="fieldset" error={!!errors.qualityCondition} sx={{ width: '100%' }}>
-                <Controller
-                  name="qualityCondition"
-                  control={control}
-                  rules={{ required: 'Required' }}
-                  render={({ field }) => (
-                    <RadioGroup row {...field}>
-                      <FormControlLabel value="Good" control={<Radio size="small" color="success" />} label={<Typography variant="body2">Good</Typography>} />
-                      <FormControlLabel value="Average" control={<Radio size="small" color="warning" />} label={<Typography variant="body2">Average</Typography>} />
-                      <FormControlLabel value="Bad" control={<Radio size="small" color="error" />} label={<Typography variant="body2">Bad</Typography>} />
-                    </RadioGroup>
-                  )}
+          <SectionLabel>Material & Receiving Details</SectionLabel>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mb: 2 }}>
+            <Grid container spacing={2.5}>
+              <Grid item xs={8}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Product Name
+                </Typography>
+                <TextField fullWidth size="small"
+                  value={record?.itemName || ''}
+                  InputProps={{ readOnly: true }}
+                  sx={{ bgcolor: 'action.hover', '& input': { color: 'text.secondary', fontWeight: 600 } }}
                 />
-              </FormControl>
-            </Box>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Quantity <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small" type="number"
+                  {...register('quantity', { required: 'Required' })}
+                  error={!!errors.quantity} helperText={errors.quantity?.message} />
+              </Grid>
+            </Grid>
           </Box>
 
-          <Divider sx={{ mb: 2.5 }} />
+          {!record?.liftNo && (
+            <>
+              <Divider sx={{ my: 2.5 }} />
+              <SectionLabel>Logistics Details (Direct Receiving)</SectionLabel>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mb: 2 }}>
+                <Grid container spacing={2.5}>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Transporter Name <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth size="small"
+                      {...register('transporterName', { required: !record?.liftNo ? 'Required' : false })}
+                      error={!!errors.transporterName} helperText={errors.transporterName?.message} />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Vehicle No. <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth size="small"
+                      {...register('vehicleNo', { required: !record?.liftNo ? 'Required' : false })}
+                      error={!!errors.vehicleNo} helperText={errors.vehicleNo?.message} />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Driver No. <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth size="small" type="tel"
+                      {...register('driverNo', { required: !record?.liftNo ? 'Required' : false })}
+                      error={!!errors.driverNo} helperText={errors.driverNo?.message} />
+                  </Grid>
 
-          {/* Section 3: Bill Upload */}
-          <SectionLabel>Bill Document</SectionLabel>
-          <input accept="image/*,.pdf" style={{ display: 'none' }} id="bill-file-upload" type="file" onChange={handleFileChange} />
-          <label htmlFor="bill-file-upload">
-            <Box sx={{
-              border: '2px dashed', borderColor: billImageFile ? 'success.main' : 'divider',
-              borderRadius: 2, p: 2.5, textAlign: 'center', cursor: 'pointer',
-              bgcolor: billImageFile ? 'success.50' : 'grey.50',
-              transition: 'all 0.2s ease',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
-            }}>
-              {billImageFile ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                  <CheckCircleOutlineIcon sx={{ color: 'success.main' }} />
-                  <Typography variant="body2" fontWeight={600} color="success.main">{billImageFile.name}</Typography>
-                </Box>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 0.5 }} />
-                  <Typography variant="body2" color="text.secondary" fontWeight={500}>Click to upload Bill Image</Typography>
-                  <Typography variant="caption" color="text.disabled">JPG, PNG, PDF accepted</Typography>
-                </>
-              )}
-            </Box>
-          </label>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Bilty No. <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth size="small"
+                      {...register('biltyNo', { required: !record?.liftNo ? 'Required' : false })}
+                      error={!!errors.biltyNo} helperText={errors.biltyNo?.message} />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Transporting Amount
+                    </Typography>
+                    <TextField fullWidth size="small" type="number"
+                      InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                      {...register('transportingAmount')} />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Party Location Link
+                    </Typography>
+                    <TextField fullWidth size="small"
+                      {...register('locationLink')} />
+                  </Grid>
 
+                  <Grid item xs={8}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Party Address <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField fullWidth size="small" multiline rows={2}
+                      {...register('partyAddress', { required: !record?.liftNo ? 'Required' : false })}
+                      error={!!errors.partyAddress} helperText={errors.partyAddress?.message} />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                      Bilty Image (Optional)
+                    </Typography>
+                    <input accept="image/*,.pdf" style={{ display: 'none' }} id="receive-bilty-upload" type="file" onChange={handleBiltyFileChange} />
+                    <label htmlFor="receive-bilty-upload">
+                      <Box sx={{
+                        border: '2px dashed', borderColor: biltyImageFile ? 'success.main' : 'divider',
+                        borderRadius: 2, p: 1, textAlign: 'center', cursor: 'pointer',
+                        bgcolor: biltyImageFile ? 'success.50' : 'grey.50',
+                        height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                      }}>
+                        {biltyImageFile ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                            <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 20 }} />
+                            <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: '100px' }}>{biltyImageFile.name}</Typography>
+                          </Box>
+                        ) : (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CloudUploadIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
+                            <Typography variant="body2" color="text.secondary" fontWeight={500}>Upload Bilty</Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </label>
+                  </Grid>
+                </Grid>
+              </Box>
+            </>
+          )}
+
+          <Divider sx={{ my: 2.5 }} />
+          <SectionLabel>Verification & Billing</SectionLabel>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Grid container spacing={2.5}>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Bill No. <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small"
+                  {...register('billNo', { required: 'Required' })}
+                  error={!!errors.billNo} helperText={errors.billNo?.message} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Quality Condition <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <Controller name="qualityCondition" control={control} rules={{ required: 'Required' }}
+                  render={({ field }) => (
+                    <TextField {...field} select fullWidth size="small" error={!!errors.qualityCondition} helperText={errors.qualityCondition?.message}>
+                      <MenuItem value="Good">Good</MenuItem>
+                      <MenuItem value="Average">Average</MenuItem>
+                      <MenuItem value="Bad">Bad</MenuItem>
+                    </TextField>
+                  )} />
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Bill Image (Optional)
+                </Typography>
+                <input accept="image/*,.pdf" style={{ display: 'none' }} id="receive-bill-upload" type="file" onChange={handleBillFileChange} />
+                <label htmlFor="receive-bill-upload">
+                  <Box sx={{
+                    border: '2px dashed', borderColor: billImageFile ? 'success.main' : 'divider',
+                    borderRadius: 2, p: 1, textAlign: 'center', cursor: 'pointer',
+                    bgcolor: billImageFile ? 'success.50' : 'grey.50',
+                    height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' }
+                  }}>
+                    {billImageFile ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                        <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 20 }} />
+                        <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: '100px' }}>{billImageFile.name}</Typography>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CloudUploadIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
+                        <Typography variant="body2" color="text.secondary" fontWeight={500}>Upload Bill</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </label>
+              </Grid>
+            </Grid>
+          </Box>
         </DialogContent>
 
-        {/* ── Footer ── */}
         <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', gap: 1 }}>
           <Button onClick={onClose} variant="outlined" color="inherit" sx={{ minWidth: 110, height: 38 }}>Cancel</Button>
           <Button type="submit" form="receive-form" variant="contained" color="primary" disabled={isSubmitting} sx={{ minWidth: 150, height: 38 }}>

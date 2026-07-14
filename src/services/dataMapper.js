@@ -423,7 +423,42 @@ export function mapWorkflowRecords(
       if (baseRecord.workflowStage.logistics !== 'Pending') {
         baseRecord.workflowStage.logistics = 'Completed';
       }
-      baseRecord.workflowStage.receiveMaterial = 'Pending';
+
+      // Read columns N to P (Planned 1, Actual 1, Time Delay 1) from LIFT-RECEIVED sheet
+      let planned1 = "";
+      let actual1 = "";
+      let timeDelay1 = "";
+      if (logistic._rawRow) {
+        planned1 = logistic._rawRow[13] || "";
+        actual1 = logistic._rawRow[14] || "";
+        timeDelay1 = logistic._rawRow[15] || "";
+      }
+      for (const key in logistic) {
+        if (key === "_rawRow") continue;
+        const normalizedKey = key.replace(/\s+/g, "").toLowerCase();
+        if (normalizedKey === "planned1") {
+          planned1 = logistic[key] || planned1;
+        } else if (normalizedKey === "actual1") {
+          actual1 = logistic[key] || actual1;
+        } else if (normalizedKey === "timedelay1") {
+          timeDelay1 = logistic[key] || timeDelay1;
+        }
+      }
+
+      baseRecord.planned1 = planned1;
+      baseRecord.actual1 = actual1;
+      baseRecord.timeDelay1 = timeDelay1;
+
+      if (planned1 && String(planned1).trim() !== "") {
+        if (!actual1 || String(actual1).trim() === "") {
+          baseRecord.workflowStage.receiveMaterial = 'Pending';
+        } else {
+          baseRecord.workflowStage.receiveMaterial = 'Completed';
+        }
+      } else {
+        baseRecord.workflowStage.receiveMaterial = null;
+      }
+
       baseRecord.liftNo = logistic["LN-Lift Number"] || logistic["LN-Lift Number "] || "";
       baseRecord.transporterName = logistic["Transporter Name"] || "";
       baseRecord.vehicleNo = logistic["Vehicle No."] || "";
