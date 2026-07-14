@@ -64,7 +64,7 @@ const LIST_COLS = [
   { key: 'unit', label: 'Unit' },
   { key: 'rate', label: 'Rate' },
   { key: 'gst', label: 'GST %' },
-  { key: 'discount', label: 'Discount Amount' },
+  { key: 'discount', label: 'Discount %' },
   { key: 'image', label: 'Image', render: v => v ? <a href={v} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontSize: '0.78rem' }}>View Link</a> : '—' },
   { key: 'leadDays', label: 'Approx Lead Days' },
   { key: 'companyName', label: 'Company Name' },

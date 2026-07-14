@@ -258,7 +258,8 @@ export function mapWorkflowRecords(
     const discount = parseNum(row["Discount Amount"] || row["Discount"]);
 
     // Calculate Amount
-    const amount = (quantity * rate * (1 + gst / 100)) - discount;
+    const afterDiscount = quantity * rate * (1 - discount / 100);
+    const amount = afterDiscount * (1 + gst / 100);
 
     const baseRecord = {
       id: row._row || (idx + 1), // use spreadsheet row number if available
