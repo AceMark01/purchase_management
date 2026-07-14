@@ -27,7 +27,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
   const { receiving, refresh, addRow, headers } = useData();
   const [billFile, setBillFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { register, handleSubmit, formState: { errors }, watch, setValue, control } = useForm({
     defaultValues: {
       productName: record?.itemName || '',
@@ -133,7 +133,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       // Loop sequentially to write each receiving row
       for (const rec of matchedRecords) {
         const itemQty = matchedRecords.length === 1 ? Number(data.quantity) : rec.quantity;
-        
+
         await addRow("receiving", {
           "Lift No.": liftNo,
           "Indent No.": rec.indentNumber,

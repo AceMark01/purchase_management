@@ -325,7 +325,7 @@ export function mapWorkflowRecords(
         baseRecord.status = approvalStatus === 'Approved' ? 'In Progress' : (approvalStatus === 'Rejected' ? 'Rejected' : baseRecord.status);
 
         if (approvalStatus === 'Approved') {
-          baseRecord.workflowStage.followUp = 'Pending';
+          // Driven by Planned2/Actual2 instead of setting followUp stage here
         }
       }
     }
@@ -341,11 +341,23 @@ export function mapWorkflowRecords(
         baseRecord.workflowStage.sendPO = 'Pending';
       } else {
         baseRecord.workflowStage.sendPO = 'Completed';
-        baseRecord.workflowStage.followUp = 'Pending';
         baseRecord.poSentStatus = poSentStatus || "Sent";
         baseRecord.sentDate = formatDateString(actual4_1);
         baseRecord.sendPORemarks = remarks4_1;
       }
+    }
+
+    // Follow-Up Stage - Driven by Planned2 and Actual2 columns
+    const planned2 = row["Planned2"] || row["Planned2 "] || "";
+    const actual2 = row["Actual2"] || row["Actual2 "] || "";
+    if (planned2 && String(planned2).trim() !== "") {
+      if (!actual2 || String(actual2).trim() === "") {
+        baseRecord.workflowStage.followUp = 'Pending';
+      } else {
+        baseRecord.workflowStage.followUp = 'Completed';
+      }
+      baseRecord.planned2 = planned2;
+      baseRecord.actual2 = actual2;
     }
 
     // Vendor Follow-up Stage
@@ -354,7 +366,8 @@ export function mapWorkflowRecords(
       const isActualEmpty = !String(actualValue).trim();
       const followUpStatus = followUp["Follow-up Status"] || "";
 
-      if (isActualEmpty) {
+      const isActual2Empty = !baseRecord.actual2 || String(baseRecord.actual2).trim() === "";
+      if (isActualEmpty && isActual2Empty) {
         baseRecord.workflowStage.followUp = 'Pending';
         baseRecord.workflowStage.logistics = null;
       } else {

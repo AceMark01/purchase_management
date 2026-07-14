@@ -244,6 +244,13 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
           throw new Error(recResult.error || "Receiving batch insert failed");
         }
 
+        // Update Actual2 in INDENT-PO
+        for (const rec of matchedRecords) {
+          await updateRow('indents', rec.id, {
+            "Actual2": timestamp
+          }, false);
+        }
+
         toast.success(`Direct Receiving completed! Lift Number ${generatedLiftNumber} generated and received.`);
       } else {
         // Other statuses (Arrange Logistics, Further Follow Up, Cancel): submit to Flw-up sheet
@@ -282,12 +289,16 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
           throw new Error(result.error || "Batch insert failed");
         }
 
-        // If user cancelled, also update the indent status in the main sheet
-        if (data.followUpStatus === 'Cancel') {
+        // If not Further Follow Up, mark Follow-Up as completed by setting Actual2
+        if (data.followUpStatus !== 'Further Follow Up') {
           for (const record of matchedRecords) {
-            await updateRow('indents', record.id, {
-              "Order Cancel": "Cancel"
-            });
+            const updatePayload = {
+              "Actual2": timestamp
+            };
+            if (data.followUpStatus === 'Cancel') {
+              updatePayload["Order Cancel"] = "Cancel";
+            }
+            await updateRow('indents', record.id, updatePayload, false);
           }
         }
 
