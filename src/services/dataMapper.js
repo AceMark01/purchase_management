@@ -48,36 +48,29 @@ const formatDateString = (d) => {
 export function mapProductRow(row, idx) {
   return {
     id: idx + 1,
-    _row: row._row || (idx + 3),
-    type: row["Product Type"] || "",
-    supplierId: row["Supplier ID"] || "",
-    supplierName: row["Supplier Name"] || "",
+    _row: row._row || (idx + 2),
+    productType: row["Product Type"] || "",
+    vendorId: row["Vendor-ID"] || "",
+    vendorName: row["Vendor Name"] || "",
     groupName: row["Group Name"] || "",
     itemName: row["Item Name"] || "",
     unit: row["Unit"] || "",
     itemCode: row["Item Code"] || "",
     purchaseRate: parseNum(row["Purchase Rate"]),
-    whatsapp: row["Party Whatsapp No."] || "",
   };
 }
 
 export function mapCompanyRow(row, idx) {
   return {
     id: idx + 1,
-    _row: row._row || (idx + 3),
+    _row: row._row || (idx + 2),
     companyName: row["Company Name"] || "",
-    gstNumber: row["GST number"] || "",
-    panNumber: row["PAN Number"] || "",
     email: row["Email"] || "",
-    phoneNumber: row["Phone Number"] || "",
-    responsibleDepartment: row["Responsible Department"] || "",
-    responsiblePerson: row["Responsible Person Name"] || "",
-    companyAddress: row["Company Address"] || "",
+    phoneNumber: row["Phone Number "] || row["Phone Number"] || "",
+    gstNumber: row["GSTIN"] || row["GST number"] || "",
+    panNumber: row["PAN"] || row["PAN Number"] || "",
     billingAddress: row["Billing Address"] || "",
-    destination: row["Destination"] || "",
-    status: row["Status"] || "Active",
-    createdDate: formatDateString(row["Created Date"]),
-    updatedDate: formatDateString(row["Updated Date"]),
+    shippingAddress: row["Shipping Address"] || "",
   };
 }
 
@@ -559,7 +552,7 @@ export function mapWorkflowRecords(
       rec.poDetails = {
         poNumber: rec.poNumber,
         poDate: rec.poDate,
-        supplierId: String(vendor.id || ""),
+        supplierId: String(vendor.vendorId || ""),
         vendorName: rec.partyName,
         vendorGst: vendor.gstNumber || "",
         vendorAddress: vendor.vendorLocation || "",

@@ -19,6 +19,7 @@ import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
 import { formatDate } from '../../utils/formatters';
 
@@ -107,6 +108,7 @@ const TABLE_COLUMNS = [
 ];
 
 export default function VendorMasterPage() {
+  const { isAdmin } = useAuth();
   const { vendors: items = [], refresh, updateRow, loading } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -218,11 +220,11 @@ export default function VendorMasterPage() {
         title="Vendor Master"
         subtitle={`${filtered.length} vendors`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Vendor Master' }]}
-        actions={
+        actions={isAdmin && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelected(null); setFormOpen(true); }}>
             Create Vendor
           </Button>
-        }
+        )}
       />
 
       <Card sx={{ mb: 2 }}>
@@ -290,7 +292,7 @@ export default function VendorMasterPage() {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'background.default', minWidth: 130 }}>Actions</TableCell>
+                {isAdmin && <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'background.default', minWidth: 130 }}>Actions</TableCell>}
                 {TABLE_COLUMNS.filter(col => visibleCols.has(col.id)).map((col) => (
                   <TableCell
                     key={col.id}
@@ -312,14 +314,14 @@ export default function VendorMasterPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: visibleCols.size + 1 }).map((_, j) => (
+                    {Array.from({ length: visibleCols.size + (isAdmin ? 1 : 0) }).map((_, j) => (
                       <TableCell key={j}><Skeleton animation="wave" height={24} /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={visibleCols.size + 1} align="center" sx={{ py: 4, color: 'text.disabled' }}>
+                  <TableCell colSpan={visibleCols.size + (isAdmin ? 1 : 0)} align="center" sx={{ py: 4, color: 'text.disabled' }}>
                     <Stack sx={{ alignItems: 'center' }} spacing={1}>
                       <PeopleAltIcon sx={{ fontSize: 40, opacity: 0.3 }} />
                       <Typography variant="body2">No vendors found</Typography>
@@ -328,20 +330,22 @@ export default function VendorMasterPage() {
                 </TableRow>
               ) : paginated.map((row) => (
                 <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Edit">
-                        <IconButton size="small" color="primary" onClick={() => { setSelected(row); setFormOpen(true); }}>
-                          <EditIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => { setSelected(row); setDeleteOpen(true); }}>
-                          <DeleteIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" color="primary" onClick={() => { setSelected(row); setFormOpen(true); }}>
+                            <EditIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" color="error" onClick={() => { setSelected(row); setDeleteOpen(true); }}>
+                            <DeleteIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  )}
                   {visibleCols.has('vendorId') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.vendorId}</TableCell>}
                   {visibleCols.has('vendorName') && <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.vendorName}</TableCell>}
                   {visibleCols.has('contactPerson') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.contactPerson}</TableCell>}

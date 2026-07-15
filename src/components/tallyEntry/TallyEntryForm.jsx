@@ -54,7 +54,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
-    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    const folderId = import.meta.env.VITE_FOLDER_TALLY;
 
     let poUrl = '';
     let biltyUrl = '';

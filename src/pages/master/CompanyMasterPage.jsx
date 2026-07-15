@@ -13,19 +13,17 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import BusinessIcon from '@mui/icons-material/Business';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
 import { formatDate, statusColor } from '../../utils/formatters';
 
-const DEPARTMENTS = [
-  'Procurement', 'Operations', 'Finance', 'HR', 'IT', 'Sales', 'Logistics', 'Admin', 'Legal', 'Management',
-];
+
 
 /* ── helpers ──────────────────────────────────────────────── */
 function descendingComparator(a, b, orderBy) {
@@ -41,11 +39,10 @@ function getComparator(order, orderBy) {
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
 function CompanyForm({ open, onClose, editItem, onSave }) {
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
-      companyName: '', gstNumber: '', panNumber: '', email: '',
-      phoneNumber: '', responsibleDepartment: '', responsiblePerson: '',
-      companyAddress: '', billingAddress: '', destination: '', status: 'Active',
+      companyName: '', email: '', phoneNumber: '', gstNumber: '',
+      panNumber: '', billingAddress: '', shippingAddress: '',
     },
   });
 
@@ -83,47 +80,14 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
             {/* Row 1 */}
             <F name="companyName" label="Company Name" sm={12} />
             {/* Row 2 */}
-            <F name="gstNumber" label="Company GST Number" sm={6} />
-            <F name="panNumber" label="Company PAN Number" sm={6} />
+            <F name="email" label="Email" type="email" sm={6} />
+            <F name="phoneNumber" label="Phone Number" sm={6} />
             {/* Row 3 */}
-            <F name="email" label="Company Email" type="email" sm={6} />
-            <F name="phoneNumber" label="Company Phone Number" sm={6} />
+            <F name="gstNumber" label="GSTIN" sm={6} />
+            <F name="panNumber" label="PAN" sm={6} />
             {/* Row 4 */}
-            <Grid item xs={12} sm={6}>
-              <Controller
-                name="responsibleDepartment"
-                control={control}
-                rules={{ required: 'Responsible Department is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field} select fullWidth size="small"
-                    label="Responsible Department"
-                    error={!!errors.responsibleDepartment}
-                    helperText={errors.responsibleDepartment?.message}
-                  >
-                    {DEPARTMENTS.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                  </TextField>
-                )}
-              />
-            </Grid>
-            <F name="responsiblePerson" label="Responsible Person Name" sm={6} />
-            {/* Row 5 */}
-            <F name="companyAddress" label="Company Address" sm={12} />
-            <F name="billingAddress" label="Billing Address" sm={8} />
-            <F name="destination" label="Destination" sm={4} />
-            {/* Row 6 */}
-            <Grid item xs={12} sm={4}>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <TextField {...field} select fullWidth size="small" label="Status">
-                    <MenuItem value="Active">Active</MenuItem>
-                    <MenuItem value="Inactive">Inactive</MenuItem>
-                  </TextField>
-                )}
-              />
-            </Grid>
+            <F name="billingAddress" label="Billing Address" sm={12} />
+            <F name="shippingAddress" label="Shipping Address" sm={12} />
           </Grid>
         </DialogContent>
         <Divider />
@@ -138,64 +102,21 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
   );
 }
 
-/* ── View Dialog ───────────────────────────────────────────── */
-function ViewDialog({ open, onClose, item }) {
-  if (!item) return null;
-  const rows = [
-    ['Company Name', item.companyName],
-    ['GST Number', item.gstNumber],
-    ['PAN Number', item.panNumber],
-    ['Email', item.email],
-    ['Phone Number', item.phoneNumber],
-    ['Responsible Department', item.responsibleDepartment],
-    ['Responsible Person', item.responsiblePerson],
-    ['Company Address', item.companyAddress],
-    ['Billing Address', item.billingAddress],
-    ['Destination', item.destination],
-    ['Status', item.status],
-    ['Created Date', formatDate(item.createdDate)],
-    ['Updated Date', formatDate(item.updatedDate)],
-  ];
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-      <DialogTitle sx={{ fontWeight: 700 }}>Company Details — {item.companyName}</DialogTitle>
-      <Divider />
-      <DialogContent sx={{ pt: 2 }}>
-        <Grid container spacing={1.5}>
-          {rows.map(([label, value]) => (
-            <Grid item xs={12} sm={6} key={label}>
-              <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
-              {label === 'Status'
-                ? <Chip label={value} size="small" color={value === 'Active' ? 'success' : 'default'} />
-                : <Typography variant="body2" fontWeight={500}>{value || '—'}</Typography>
-              }
-            </Grid>
-          ))}
-        </Grid>
-      </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
-    </Dialog>
-  );
-}
-
-/* ── Main Page ─────────────────────────────────────────────── */
 const TABLE_COLUMNS = [
   { id: 'companyName', label: 'Company Name', minWidth: 160 },
-  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
-  { id: 'panNumber', label: 'PAN Number', minWidth: 120 },
   { id: 'email', label: 'Email', minWidth: 170 },
   { id: 'phoneNumber', label: 'Phone Number', minWidth: 130 },
-  { id: 'responsiblePerson', label: 'Responsible Person', minWidth: 150 },
-  { id: 'destination', label: 'Destination', minWidth: 120 },
-  { id: 'status', label: 'Status', minWidth: 100 },
-  { id: 'createdDate', label: 'Created Date', minWidth: 120 },
+  { id: 'gstNumber', label: 'GSTIN', minWidth: 160 },
+  { id: 'panNumber', label: 'PAN', minWidth: 120 },
+  { id: 'billingAddress', label: 'Billing Address', minWidth: 200 },
+  { id: 'shippingAddress', label: 'Shipping Address', minWidth: 200 },
 ];
 
 export default function CompanyMasterPage() {
+  const { isAdmin } = useAuth();
   const { companies: items = [], refresh, updateRow } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
@@ -216,11 +137,12 @@ export default function CompanyMasterPage() {
   const filtered = useMemo(() =>
     items.filter((c) =>
       !search ||
-      c.companyName.toLowerCase().includes(search.toLowerCase()) ||
-      c.gstNumber.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.responsiblePerson.toLowerCase().includes(search.toLowerCase()) ||
-      c.destination.toLowerCase().includes(search.toLowerCase())
+      (c.companyName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.gstNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.panNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.billingAddress || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.shippingAddress || '').toLowerCase().includes(search.toLowerCase())
     ), [items, search]);
 
   const sorted = useMemo(() =>
@@ -235,21 +157,14 @@ export default function CompanyMasterPage() {
     const isEdit = !!selected;
     try {
       let result;
-      const todayStr = formatDate(new Date());
       const payload = {
         "Company Name": data.companyName,
-        "GST number": data.gstNumber,
-        "PAN Number": data.panNumber,
         "Email": data.email,
-        "Phone Number": data.phoneNumber,
-        "Responsible Department": data.responsibleDepartment,
-        "Responsible Person Name": data.responsiblePerson,
-        "Company Address": data.companyAddress,
+        "Phone Number ": data.phoneNumber,
+        "GSTIN": data.gstNumber,
+        "PAN": data.panNumber,
         "Billing Address": data.billingAddress,
-        "Destination": data.destination,
-        "Status": data.status,
-        "Created Date": isEdit ? (selected.createdDate || todayStr) : todayStr,
-        "Updated Date": todayStr,
+        "Shipping Address": data.shippingAddress,
       };
 
       if (isEdit) {
@@ -258,20 +173,14 @@ export default function CompanyMasterPage() {
       } else {
         const rowValues = [
           payload["Company Name"],
-          payload["GST number"],
-          payload["PAN Number"],
           payload["Email"],
-          payload["Phone Number"],
-          payload["Responsible Department"],
-          payload["Responsible Person Name"],
-          payload["Company Address"],
+          payload["Phone Number "],
+          payload["GSTIN"],
+          payload["PAN"],
           payload["Billing Address"],
-          payload["Destination"],
-          payload["Status"],
-          payload["Created Date"],
-          payload["Updated Date"]
+          payload["Shipping Address"],
         ];
-        result = await gasApi.insertInColumns("Master Data", 13, rowValues, 2);
+        result = await gasApi.insertInColumns("Master-Company", 1, rowValues, 1);
       }
 
       if (result.success) {
@@ -286,7 +195,7 @@ export default function CompanyMasterPage() {
 
   const handleDelete = async () => {
     try {
-      const result = await gasApi.deleteRowInColumns("Master Data", selected._row, 13, 13);
+      const result = await gasApi.deleteRow("Master-Company", selected._row);
       if (result.success) {
         toast.success('Company deleted successfully!');
         await refresh();
@@ -306,11 +215,11 @@ export default function CompanyMasterPage() {
         title="Company Master"
         subtitle={`${filtered.length} companies`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Company Master' }]}
-        actions={
+        actions={isAdmin && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelected(null); setFormOpen(true); }}>
             Create Company
           </Button>
-        }
+        )}
       />
 
       <Card sx={{ mb: 2 }}>
@@ -372,7 +281,7 @@ export default function CompanyMasterPage() {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'background.default', minWidth: 130 }}>Actions</TableCell>
+                {isAdmin && <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'background.default', minWidth: 130 }}>Actions</TableCell>}
                 {TABLE_COLUMNS.filter(col => visibleCols.has(col.id)).map((col) => (
                   <TableCell
                     key={col.id}
@@ -393,7 +302,7 @@ export default function CompanyMasterPage() {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={visibleCols.size + 1} align="center" sx={{ py: 4, color: 'text.disabled' }}>
+                  <TableCell colSpan={visibleCols.size + (isAdmin ? 1 : 0)} align="center" sx={{ py: 4, color: 'text.disabled' }}>
                     <Stack sx={{ alignItems: 'center' }} spacing={1}>
                       <BusinessIcon sx={{ fontSize: 40, opacity: 0.3 }} />
                       <Typography variant="body2">No companies found</Typography>
@@ -402,26 +311,21 @@ export default function CompanyMasterPage() {
                 </TableRow>
               ) : paginated.map((row) => (
                 <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="View"><IconButton size="small" color="info" onClick={() => { setSelected(row); setViewOpen(true); }}><VisibilityIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-                      <Tooltip title="Edit"><IconButton size="small" color="primary" onClick={() => { setSelected(row); setFormOpen(true); }}><EditIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-                      <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setSelected(row); setDeleteOpen(true); }}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-                    </Stack>
-                  </TableCell>
-                  {visibleCols.has('companyName') && <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.companyName}</TableCell>}
-                  {visibleCols.has('gstNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>}
-                  {visibleCols.has('panNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.panNumber}</TableCell>}
-                  {visibleCols.has('email') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>}
-                  {visibleCols.has('phoneNumber') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>}
-                  {visibleCols.has('responsiblePerson') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.responsiblePerson}</TableCell>}
-                  {visibleCols.has('destination') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.destination}</TableCell>}
-                  {visibleCols.has('status') && (
+                  {isAdmin && (
                     <TableCell>
-                      <Chip label={row.status} size="small" color={row.status === 'Active' ? 'success' : 'default'} sx={{ fontWeight: 600, fontSize: '0.72rem', height: 22 }} />
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Edit"><IconButton size="small" color="primary" onClick={() => { setSelected(row); setFormOpen(true); }}><EditIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+                        <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setSelected(row); setDeleteOpen(true); }}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+                      </Stack>
                     </TableCell>
                   )}
-                  {visibleCols.has('createdDate') && <TableCell sx={{ fontSize: '0.78rem' }}>{formatDate(row.createdDate)}</TableCell>}
+                  {visibleCols.has('companyName') && <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.companyName}</TableCell>}
+                  {visibleCols.has('email') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>}
+                  {visibleCols.has('phoneNumber') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>}
+                  {visibleCols.has('gstNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>}
+                  {visibleCols.has('panNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.panNumber}</TableCell>}
+                  {visibleCols.has('billingAddress') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.billingAddress}</TableCell>}
+                  {visibleCols.has('shippingAddress') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.shippingAddress}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>
@@ -446,7 +350,6 @@ export default function CompanyMasterPage() {
           onSave={handleSave}
         />
       )}
-      <ViewDialog open={viewOpen} onClose={() => { setViewOpen(false); setSelected(null); }} item={selected} />
       <ConfirmDialog
         open={deleteOpen}
         onConfirm={handleDelete}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid,
@@ -69,15 +69,15 @@ const COLUMNS = [
 ];
 
 function UserForm({ open, onClose, editItem, onSave }) {
-  const getInitialPages = () => {
+  const getInitialPages = useCallback(() => {
     const acc = {};
     PAGES.forEach(p => {
       acc[p.key] = false;
     });
 
     if (editItem) {
-      const pa = String(editItem.pageAccess || '').trim().toUpperCase();
-      if (pa === 'ALL') {
+      const pa = String(editItem.pageAccess || '').trim();
+      if (pa.toUpperCase() === 'ALL') {
         PAGES.forEach(p => {
           acc[p.key] = true;
         });
@@ -91,15 +91,23 @@ function UserForm({ open, onClose, editItem, onSave }) {
       }
     }
     return acc;
-  };
+  }, [editItem]);
 
   const [selectedPages, setSelectedPages] = useState(getInitialPages);
   const [showFormPwd, setShowFormPwd] = useState(false);
   const [pageError, setPageError] = useState('');
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
     defaultValues: editItem || { name: '', email: '', password: '', role: 'user' },
   });
+
+  useEffect(() => {
+    if (open) {
+      setSelectedPages(getInitialPages());
+      setPageError('');
+      reset(editItem || { name: '', email: '', password: '', role: 'user' });
+    }
+  }, [editItem, open, getInitialPages, reset]);
 
   const onSubmit = (data) => {
     const selectedKeys = Object.keys(selectedPages).filter(k => selectedPages[k]);
@@ -112,6 +120,19 @@ function UserForm({ open, onClose, editItem, onSave }) {
       selectedPages: selectedKeys
     });
     onClose();
+  };
+
+  const allChecked = PAGES.every(p => selectedPages[p.key]);
+  const handleAllChange = (e) => {
+    const checked = e.target.checked;
+    setSelectedPages(prev => {
+      const next = {};
+      PAGES.forEach(p => {
+        next[p.key] = checked;
+      });
+      if (checked) setPageError('');
+      return next;
+    });
   };
 
   return (
@@ -172,6 +193,19 @@ function UserForm({ open, onClose, editItem, onSave }) {
                 PAGE ACCESS * {pageError && <span style={{ color: 'red', fontSize: '0.75rem', marginLeft: '8px' }}>{pageError}</span>}
               </Typography>
               <Grid container spacing={1}>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={allChecked}
+                        indeterminate={!allChecked && PAGES.some(p => selectedPages[p.key])}
+                        onChange={handleAllChange}
+                        size="small"
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ fontWeight: 'bold' }}>ALL</Typography>}
+                  />
+                </Grid>
                 {PAGES.map((page) => (
                   <Grid item xs={12} sm={6} key={page.key}>
                     <FormControlLabel
@@ -280,7 +314,7 @@ export default function SettingsPage() {
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]}
         actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelected(null); setFormOpen(true); }}>Create User</Button>}
       />
-      <DataTable columns={COLUMNS} rows={items} title="Users" searchKey={['name', 'email']} actions={actions} />
+      <DataTable columns={COLUMNS} rows={items} title="Users" searchKey={['name', 'email']} actions={actions} hideIndexColumn />
       {formOpen && (
         <UserForm open={formOpen} onClose={() => { setFormOpen(false); setSelected(null); }} editItem={selected} onSave={handleSave} />
       )}

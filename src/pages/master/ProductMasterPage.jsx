@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import {
   Box, Button, Typography, Chip, Dialog, DialogTitle, DialogContent,
   DialogActions, Grid, TextField, MenuItem, Divider, IconButton, Tooltip,
@@ -12,40 +11,50 @@ import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import DataTable  from '../../components/common/DataTable';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
 import { formatCurrency } from '../../utils/formatters';
 
-const PRODUCT_TYPES = ['Raw Material', 'Consumables', 'Capital Equipment', 'Office Supply', 'IT Equipment'];
-
 const COLUMNS = [
-  { key: 'type',         label: 'Product Type',       render: v => <Chip label={v} size="small" sx={{ fontSize: '0.68rem', height: 22, fontWeight: 600 }} /> },
-  { key: 'supplierId',   label: 'Supplier ID',         render: v => <Typography variant="body2" fontWeight={600} color="text.secondary">{v}</Typography> },
-  { key: 'supplierName', label: 'Supplier Name',       render: v => <Typography variant="body2" fontWeight={700} color="primary.main">{v}</Typography> },
-  { key: 'groupName',    label: 'Group Name',          render: v => <Chip label={v} size="small" variant="outlined" color="primary" sx={{ height: 22, fontSize: '0.68rem', fontWeight: 600 }} /> },
-  { key: 'itemName',     label: 'Item Name',           render: v => <Typography variant="body2" fontWeight={500} sx={{ maxWidth: 200 }}>{v}</Typography> },
-  { key: 'unit',         label: 'Unit',                render: v => <Chip label={v} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.68rem' }} /> },
-  { key: 'itemCode',     label: 'Item Code',           render: v => <Typography variant="caption" fontFamily="monospace" fontWeight={700} bgcolor="action.hover" px={0.8} py={0.3} borderRadius={0.5}>{v}</Typography> },
-  { key: 'purchaseRate', label: 'Purchase Rate',       render: v => <Typography variant="body2" fontWeight={700} color="success.main">{formatCurrency(v)}</Typography> },
-  { key: 'whatsapp',    label: 'Party Whatsapp No.',  render: v => <Typography variant="body2" color="text.secondary">📱 {v}</Typography> },
+  { key: 'productType',  label: 'Product Type',       render: v => <Chip label={v} size="small" sx={{ fontSize: '0.68rem', height: 22, fontWeight: 600 }} /> },
+  { key: 'vendorId',     label: 'Vendor ID',          render: v => <Typography variant="body2" fontWeight={600} color="text.secondary">{v}</Typography> },
+  { key: 'vendorName',   label: 'Vendor Name',        render: v => <Typography variant="body2" fontWeight={700} color="primary.main">{v}</Typography> },
+  { key: 'groupName',    label: 'Group Name',         render: v => <Chip label={v} size="small" variant="outlined" color="primary" sx={{ height: 22, fontSize: '0.68rem', fontWeight: 600 }} /> },
+  { key: 'itemName',     label: 'Item Name',          render: v => <Typography variant="body2" fontWeight={500} sx={{ maxWidth: 200 }}>{v}</Typography> },
+  { key: 'unit',         label: 'Unit',               render: v => <Chip label={v} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.68rem' }} /> },
+  { key: 'itemCode',     label: 'Item Code',          render: v => <Typography variant="caption" fontFamily="monospace" fontWeight={700} bgcolor="action.hover" px={0.8} py={0.3} borderRadius={0.5}>{v}</Typography> },
+  { key: 'purchaseRate', label: 'Purchase Rate',      render: v => <Typography variant="body2" fontWeight={700} color="success.main">{formatCurrency(v)}</Typography> },
 ];
 
 function ProductForm({ open, onClose, editItem, onSave }) {
-  const vendors = useSelector(state => state.vendorMaster.items) || [];
-  
-  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
+  const { vendors = [], productTypes = [], units = [] } = useData();
+
+  const { register, control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
     defaultValues: {
-      type: '', supplierId: '', supplierName: '', groupName: '',
-      itemName: '', unit: '', itemCode: '', purchaseRate: '', whatsapp: '',
+      productType: '', vendorId: '', vendorName: '', groupName: '',
+      itemName: '', unit: '', itemCode: '', purchaseRate: '',
     },
   });
+
+  const selectedVendorName = watch('vendorName');
+  useEffect(() => {
+    if (selectedVendorName) {
+      const ven = vendors.find(v => v.vendorName === selectedVendorName);
+      if (ven) {
+        setValue('vendorId', ven.vendorId || '');
+      }
+    } else {
+      setValue('vendorId', '');
+    }
+  }, [selectedVendorName, vendors, setValue]);
 
   useEffect(() => {
     if (editItem) {
       reset(editItem);
     } else {
       reset({
-        type: '', supplierId: '', supplierName: '', groupName: '',
-        itemName: '', unit: '', itemCode: '', purchaseRate: '', whatsapp: '',
+        productType: '', vendorId: '', vendorName: '', groupName: '',
+        itemName: '', unit: '', itemCode: '', purchaseRate: '',
       });
     }
   }, [editItem, open, reset]);
@@ -74,43 +83,45 @@ function ProductForm({ open, onClose, editItem, onSave }) {
         <DialogContent sx={{ pt: 2.5 }}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Controller name="type" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Product Type" error={!!errors.type} helperText={errors.type?.message} sx={INPUT_SX}>
-                  {PRODUCT_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+              <Controller name="productType" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
+                <TextField {...f} select fullWidth size="small" label="Product Type" error={!!errors.productType} helperText={errors.productType?.message} sx={INPUT_SX}>
+                  {productTypes.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                  {f.value && !productTypes.includes(f.value) && (
+                    <MenuItem value={f.value}>{f.value}</MenuItem>
+                  )}
                 </TextField>
               )} />
             </Grid>
-            <Grid item xs={12} sm={6}>{field('supplierId', 'Supplier ID')}</Grid>
             <Grid item xs={12} sm={6}>
-              <Controller name="supplierName" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField 
-                  {...f} 
-                  select 
-                  fullWidth 
-                  size="small" 
-                  label="Supplier Name" 
-                  error={!!errors.supplierName} 
-                  helperText={errors.supplierName?.message} 
-                  sx={INPUT_SX}
-                  onChange={(e) => {
-                    f.onChange(e.target.value);
-                    const selectedVen = vendors.find(v => v.vendorName === e.target.value);
-                    if (selectedVen) {
-                      setValue('supplierId', String(selectedVen.id || ''));
-                      setValue('whatsapp', selectedVen.phoneNumber || '');
-                    }
-                  }}
-                >
+              <Controller name="vendorName" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
+                <TextField {...f} select fullWidth size="small" label="Vendor Name" error={!!errors.vendorName} helperText={errors.vendorName?.message} sx={INPUT_SX}>
                   {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                 </TextField>
               )} />
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth size="small" label="Vendor ID"
+                InputProps={{ readOnly: true }}
+                InputLabelProps={{ shrink: true }}
+                sx={INPUT_SX}
+                {...register('vendorId')}
+              />
+            </Grid>
             <Grid item xs={12} sm={6}>{field('groupName', 'Group Name')}</Grid>
             <Grid item xs={12} sm={6}>{field('itemName', 'Item Name')}</Grid>
-            <Grid item xs={12} sm={6}>{field('unit', 'Unit')}</Grid>
+            <Grid item xs={12} sm={6}>
+              <Controller name="unit" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
+                <TextField {...f} select fullWidth size="small" label="Unit" error={!!errors.unit} helperText={errors.unit?.message} sx={INPUT_SX}>
+                  {units.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+                  {f.value && !units.includes(f.value) && (
+                    <MenuItem value={f.value}>{f.value}</MenuItem>
+                  )}
+                </TextField>
+              )} />
+            </Grid>
             <Grid item xs={12} sm={6}>{field('itemCode', 'Item Code')}</Grid>
             <Grid item xs={12} sm={6}>{field('purchaseRate', 'Purchase Rate', { type: 'number' })}</Grid>
-            <Grid item xs={12} sm={6}>{field('whatsapp', 'Party Whatsapp No.', { required: false })}</Grid>
           </Grid>
         </DialogContent>
         <Divider />
@@ -124,6 +135,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
 }
 
 export default function ProductMasterPage() {
+  const { isAdmin } = useAuth();
   const { products, refresh, updateRow } = useData();
   const [formOpen, setFormOpen]  = useState(false);
   const [editItem, setEditItem]  = useState(null);
@@ -134,32 +146,30 @@ export default function ProductMasterPage() {
     try {
       let result;
       const payload = {
-        "Product Type": item.type,
-        "Supplier ID": item.supplierId,
-        "Supplier Name": item.supplierName,
+        "Product Type": item.productType,
+        "Vendor-ID": item.vendorId,
+        "Vendor Name": item.vendorName,
         "Group Name": item.groupName,
         "Item Name": item.itemName,
         "Unit": item.unit,
         "Item Code": item.itemCode,
         "Purchase Rate": Number(item.purchaseRate) || 0,
-        "Party Whatsapp No.": item.whatsapp || "",
       };
       if (isEdit) {
         await updateRow('products', existing._row, payload);
         result = { success: true };
       } else {
-        const rowData = [
+        const rowValues = [
           payload["Product Type"],
-          payload["Supplier ID"],
-          payload["Supplier Name"],
+          payload["Vendor-ID"],
+          payload["Vendor Name"],
           payload["Group Name"],
           payload["Item Name"],
           payload["Unit"],
           payload["Item Code"],
-          payload["Purchase Rate"],
-          payload["Party Whatsapp No."]
+          payload["Purchase Rate"]
         ];
-        result = await gasApi.insertInColumns("Master Data", 1, rowData, 2);
+        result = await gasApi.insertInColumns("Master-Products", 1, rowValues, 1);
       }
       if (result.success) {
         toast.success(isEdit ? 'Product updated!' : 'Product added!');
@@ -174,7 +184,7 @@ export default function ProductMasterPage() {
   const handleDelete = async row => {
     if (!window.confirm(`Are you sure you want to delete product "${row.itemName}"?`)) return;
     try {
-      const result = await gasApi.deleteRowInColumns("Master Data", row._row, 1, 9);
+      const result = await gasApi.deleteRow("Master-Products", row._row);
       if (result.success) {
         toast.success('Product deleted.');
         await refresh();
@@ -185,28 +195,31 @@ export default function ProductMasterPage() {
     }
   };
 
-  const actions = row => (
-    <Box display="flex" gap={0.5}>
-      <Tooltip title="Edit" arrow>
-        <IconButton
-          size="small"
-          onClick={() => { setEditItem(row); setFormOpen(true); }}
-          sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'primary.dark' } }}
-        >
-          <EditIcon sx={{ fontSize: 14 }} />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="Delete" arrow>
-        <IconButton
-          size="small"
-          onClick={() => handleDelete(row)}
-          sx={{ bgcolor: '#ef4444', color: 'white', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: '#dc2626' } }}
-        >
-          <DeleteIcon sx={{ fontSize: 14 }} />
-        </IconButton>
-      </Tooltip>
-    </Box>
-  );
+  const actions = row => {
+    if (!isAdmin) return null;
+    return (
+      <Box display="flex" gap={0.5}>
+        <Tooltip title="Edit" arrow>
+          <IconButton
+            size="small"
+            color="primary"
+            onClick={() => { setEditItem(row); setFormOpen(true); }}
+          >
+            <EditIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Delete" arrow>
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => handleDelete(row)}
+          >
+            <DeleteIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    );
+  };
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -214,21 +227,22 @@ export default function ProductMasterPage() {
         title="Product Data"
         subtitle="Master reference table for all products and their supplier mapping"
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Masters' }, { label: 'Product Data' }]}
-        actions={
+        actions={isAdmin && (
           <Button
             variant="contained" startIcon={<AddIcon />}
             onClick={() => { setEditItem(null); setFormOpen(true); }}
           >
             Add Product
           </Button>
-        }
+        )}
       />
       <DataTable
         title="Product List"
         columns={COLUMNS}
         rows={products}
-        searchKey={['itemName', 'supplierName', 'itemCode', 'groupName']}
-        actions={actions}
+        searchKey={['itemName', 'vendorName', 'itemCode', 'groupName']}
+        actions={isAdmin ? actions : null}
+        hideIndexColumn
       />
       <ProductForm
         open={formOpen}

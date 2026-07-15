@@ -24,6 +24,8 @@ const PAGE_TITLES = {
   '/dashboard':        { label: 'Dashboard',              sub: 'Overview & analytics' },
   '/indent':           { label: 'Indent Management',      sub: 'Manage purchase indents' },
   '/purchase-order':   { label: 'Generate Purchase PO',   sub: 'Create & manage purchase orders' },
+  '/approval-po':      { label: 'Approval Purchase PO',   sub: 'Review & approve purchase orders' },
+  '/send-po':          { label: 'Send PO To Party',        sub: 'Dispatch purchase orders to vendors' },
   '/follow-up':        { label: 'Follow-Up',              sub: 'Track vendor follow-ups' },
   '/logistics':        { label: 'Arrange Logistics',      sub: 'Manage transport & delivery' },
   '/lifting':          { label: 'Get Lifting',            sub: 'Schedule material lifting' },
@@ -32,6 +34,9 @@ const PAGE_TITLES = {
   '/tally-entry':      { label: 'Tally Entry',            sub: 'Financial voucher entries' },
   '/settings':         { label: 'Settings',               sub: 'Manage system users & roles' },
   '/reports':          { label: 'Reports & Analytics',    sub: 'Business intelligence' },
+  '/master':           { label: 'Company Master',         sub: 'Manage company records' },
+  '/product-data':     { label: 'Product Master',         sub: 'Manage product catalog' },
+  '/vendors':          { label: 'Vendor Master',          sub: 'Manage vendor records' },
 };
 
 const NOTIF_ICONS = {

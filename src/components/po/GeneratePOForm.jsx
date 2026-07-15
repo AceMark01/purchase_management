@@ -81,7 +81,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       if (firstRec) {
         const ven = vendors.find(v => v.vendorName === firstRec.partyName);
         if (ven) {
-          setValue('supplierId', ven.id);
+          setValue('supplierId', ven.vendorId);
         }
       }
     }
@@ -117,7 +117,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId', ven.id);
+        setValue('supplierId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
@@ -152,7 +152,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId', ven.id);
+        setValue('supplierId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
@@ -187,7 +187,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     if (isViewMode) return;
     if (!selectedSupplierId || !vendors.length) { replace([]); return; }
 
-    const ven = vendors.find(v => v.id === selectedSupplierId);
+    const ven = vendors.find(v => v.vendorId === selectedSupplierId);
     if (!ven) return;
 
     setValue('vendorName', ven.vendorName || '');
@@ -296,7 +296,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       const pdfBase64 = pdf.output('datauristring');
 
       toast.info("Uploading PDF to Google Drive...");
-      const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+      const folderId = import.meta.env.VITE_FOLDER_PO;
       const uploadResponse = await gasApi.uploadFile({
         base64Data: pdfBase64,
         fileName: `${data.poNumber}.pdf`,
@@ -458,12 +458,12 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
                       <MenuItem value="" disabled>
                         {availableVendors.length === 0 ? 'No pending indents' : 'Select Supplier...'}
                       </MenuItem>
-                      {availableVendors.map(v => <MenuItem key={v.id} value={v.id}>{v.vendorName}</MenuItem>)}
-                      {field.value && !availableVendors.some(v => v.id === field.value) && (
+                      {availableVendors.map(v => <MenuItem key={v.vendorId || v.id} value={v.vendorId}>{v.vendorName}</MenuItem>)}
+                      {field.value && !availableVendors.some(v => v.vendorId === field.value) && (
                         (() => {
-                          const currentVen = vendors.find(v => v.id === field.value);
+                          const currentVen = vendors.find(v => v.vendorId === field.value);
                           return currentVen ? (
-                            <MenuItem key={currentVen.id} value={currentVen.id}>{currentVen.vendorName}</MenuItem>
+                            <MenuItem key={currentVen.vendorId || currentVen.id} value={currentVen.vendorId}>{currentVen.vendorName}</MenuItem>
                           ) : null;
                         })()
                       )}

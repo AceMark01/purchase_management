@@ -62,7 +62,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
 
     setIsSubmitting(true);
     let receiverImageUrl = '';
-    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    const folderId = import.meta.env.VITE_FOLDER_LIFTED;
 
     if (receiverFile && folderId) {
       try {

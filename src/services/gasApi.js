@@ -58,7 +58,10 @@ export const gasApi = {
       { key: "receiving", name: "RECEIVED-ACCOUNTS" },
       { key: "masterData", name: "Master Data" },
       { key: "users", name: "LOGIN" },
-      { key: "vendorsData", name: "Master-Vendors" }
+      { key: "vendorsData", name: "Master-Vendors" },
+      { key: "productsData", name: "Master-Products" },
+      { key: "dropdowns", name: "Dropdown" },
+      { key: "companiesData", name: "Master-Company" }
     ];
     
     const sheetNames = activeSheets.map(s => s.name).join(",");

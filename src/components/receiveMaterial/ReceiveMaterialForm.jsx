@@ -104,7 +104,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
     setIsSubmitting(true);
     let billImageUrl = '';
     let biltyImageUrl = '';
-    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    const folderId = import.meta.env.VITE_FOLDER_BILL;
 
     if (folderId) {
       if (billFile) {

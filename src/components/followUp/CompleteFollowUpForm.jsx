@@ -106,7 +106,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
       if (data.followUpStatus === 'Direct Receiving') {
         // 1. Upload Bilty image (if any)
         let biltyImageUrl = '';
-        const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+        const folderId = import.meta.env.VITE_GOOGLE_FOLDER_INDENT;
 
         if (biltyFile && folderId) {
           try {

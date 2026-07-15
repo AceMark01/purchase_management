@@ -80,7 +80,7 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
 
     setIsSubmitting(true);
     let biltyImageUrl = '';
-    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    const folderId = import.meta.env.VITE_FOLDER_BILTY;
 
     if (biltyFile && folderId) {
       try {
@@ -148,7 +148,7 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
         }
 
         toast.success(`Logistics arranged! Lift Number ${result.liftNumber} generated.`);
-        await refresh(['indents'], false);
+        await refresh(['indents', 'logistics'], false);
         onClose();
       } else {
         throw new Error(result.error || "Logistics batch insert failed");

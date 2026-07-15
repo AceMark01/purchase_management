@@ -79,8 +79,8 @@ const SHEET_MAP = {
   "followUps": "Flw-up",
   "logistics": "LIFT-RECEIVED",
   "receiving": "RECEIVED-ACCOUNTS",
-  "products": "Master Data",
-  "companies": "Master Data",
+  "products": "Master-Products",
+  "companies": "Master-Company",
   "vendors": "Master-Vendors",
   "users": "LOGIN",
   "whatsapp": "Whatsapp Form",
@@ -188,6 +188,11 @@ export function DataProvider({ children }) {
   const [rawFollowUps, setRawFollowUps] = useState([]);
   const [rawMasterData, setRawMasterData] = useState([]);
   const [rawVendorsData, setRawVendorsData] = useState([]);
+  const [rawCompaniesData, setRawCompaniesData] = useState([]);
+  const [rawProductsData, setRawProductsData] = useState([]);
+  const [rawDropdowns, setRawDropdowns] = useState([]);
+  const [productTypesState, setProductTypesState] = useState([]);
+  const [unitsState, setUnitsState] = useState([]);
   const [rawUsers, setRawUsers] = useState([]);
   const [rawWhatsapp, setRawWhatsapp] = useState([]);
   const [rawPoSentStatus, setRawPoSentStatus] = useState([]);
@@ -214,7 +219,10 @@ export function DataProvider({ children }) {
           { key: "receiving", name: "RECEIVED-ACCOUNTS" },
           { key: "masterData", name: "Master Data" },
           { key: "users", name: "LOGIN" },
-          { key: "vendorsData", name: "Master-Vendors" }
+          { key: "vendorsData", name: "Master-Vendors" },
+          { key: "productsData", name: "Master-Products" },
+          { key: "dropdowns", name: "Dropdown" },
+          { key: "companiesData", name: "Master-Company" }
         ];
 
         const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
@@ -238,6 +246,9 @@ export function DataProvider({ children }) {
       const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving2D;
       const masterDataRaw = fetchedData.masterData !== undefined ? fetchedData.masterData : rawMasterData;
       const vendorsDataRaw = fetchedData.vendorsData !== undefined ? fetchedData.vendorsData : rawVendorsData;
+      const productsDataRaw = fetchedData.productsData !== undefined ? fetchedData.productsData : rawProductsData;
+      const companiesDataRaw = fetchedData.companiesData !== undefined ? fetchedData.companiesData : rawCompaniesData;
+      const dropdownsRaw = fetchedData.dropdowns !== undefined ? fetchedData.dropdowns : rawDropdowns;
       const usersRaw = fetchedData.users !== undefined ? fetchedData.users : rawUsers;
       const whatsappRaw = fetchedData.whatsapp !== undefined ? fetchedData.whatsapp : rawWhatsapp;
       const poSentStatusRaw = fetchedData.poSentStatus !== undefined ? fetchedData.poSentStatus : rawPoSentStatus;
@@ -263,6 +274,9 @@ export function DataProvider({ children }) {
       if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving2D(receivingRaw);
       if (fetchedData.masterData !== undefined || !sheetsToFetch) setRawMasterData(masterDataRaw);
       if (fetchedData.vendorsData !== undefined || !sheetsToFetch) setRawVendorsData(vendorsDataRaw);
+      if (fetchedData.companiesData !== undefined || !sheetsToFetch) setRawCompaniesData(companiesDataRaw);
+      if (fetchedData.productsData !== undefined || !sheetsToFetch) setRawProductsData(productsDataRaw);
+      if (fetchedData.dropdowns !== undefined || !sheetsToFetch) setRawDropdowns(dropdownsRaw);
       if (fetchedData.users !== undefined || !sheetsToFetch) setRawUsers(usersRaw);
       if (fetchedData.whatsapp !== undefined || !sheetsToFetch) setRawWhatsapp(whatsappRaw);
       if (fetchedData.poSentStatus !== undefined || !sheetsToFetch) setRawPoSentStatus(poSentStatusRaw);
@@ -293,19 +307,29 @@ export function DataProvider({ children }) {
         return obj;
       };
 
-      // Products: columns A-I (0-8)
-      const productHeaders = (masterDataRaw[1] || []).slice(0, 9).map(h => String(h || "").trim());
-      const productsObj = masterDataRaw.slice(2).map((row, idx) => ({
-        _row: idx + 3,
+      // Products: from "Master-Products" sheet, columns A-H (0-7), header row = 1
+      const productHeaders = (productsDataRaw[0] || []).map(h => String(h || "").trim());
+      const productsObj = productsDataRaw.slice(1).map((row, idx) => ({
+        _row: idx + 2,
         ...sliceRowToObj(row, productHeaders, 0)
       })).filter(r => r["Product Type"] && String(r["Product Type"]).trim() !== "");
       const mappedProducts = productsObj.map((row, idx) => mapProductRow(row, idx));
 
-      // Companies: columns M-Y (12-24)
-      const companyHeaders = (masterDataRaw[1] || []).slice(12, 25).map(h => String(h || "").trim());
-      const companiesObj = masterDataRaw.slice(2).map((row, idx) => ({
-        _row: idx + 3,
-        ...sliceRowToObj(row, companyHeaders, 12)
+      // Dropdowns: from "Dropdown" sheet, header row = 1
+      const productTypesList = dropdownsRaw.slice(1)
+        .map(row => String(row[1] || "").trim())
+        .filter(val => val && val !== "Product Type");
+      const unitsList = dropdownsRaw.slice(1)
+        .map(row => String(row[2] || "").trim())
+        .filter(val => val && val !== "UOM");
+      setProductTypesState([...new Set(productTypesList)]);
+      setUnitsState([...new Set(unitsList)]);
+
+      // Companies: from "Master-Company" sheet, columns A-G (0-6), header row = 1
+      const companyHeaders = (companiesDataRaw[0] || []).map(h => String(h || "").trim());
+      const companiesObj = companiesDataRaw.slice(1).map((row, idx) => ({
+        _row: idx + 2,
+        ...sliceRowToObj(row, companyHeaders, 0)
       })).filter(r => r["Company Name"] && String(r["Company Name"]).trim() !== "");
       const mappedCompanies = companiesObj.map((row, idx) => mapCompanyRow(row, idx));
 
@@ -378,12 +402,11 @@ export function DataProvider({ children }) {
       setUsersState(mappedUsers);
       dispatch(setUsers(mappedUsers));
 
-      // Order By (col-K): index 10 in Master Data raw sheet
-      const orderByValues = masterDataRaw.slice(2)
-        .map(row => String(row[10] || "").trim())
-        .filter(val => val !== "");
-      const mappedOrderBy = [...new Set(orderByValues)];
-      setOrderByListState(mappedOrderBy);
+      // Order By: from "Dropdown" sheet, column A (index 0), header row = 1
+      const orderByValues = dropdownsRaw.slice(1)
+        .map(row => String(row[0] || "").trim())
+        .filter(val => val && val !== "Order By");
+      setOrderByListState([...new Set(orderByValues)]);
 
       // Map workflow records (derived)
       const mappedRecords = mapWorkflowRecords(
@@ -587,7 +610,7 @@ export function DataProvider({ children }) {
     const headers = headersState[resource] || [];
     let colOffset = 0;
     if (resource === "companies") {
-      colOffset = 12;
+      colOffset = 0;
     } else if (resource === "vendors") {
       colOffset = 0;
     } else if (resource === "products") {
@@ -661,6 +684,8 @@ export function DataProvider({ children }) {
         addRow,
         poHistoryRecords,
         pendingPoRecords,
+        productTypes: productTypesState,
+        units: unitsState,
         orderByList: orderByListState
       }}
     >

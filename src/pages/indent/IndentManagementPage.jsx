@@ -22,12 +22,6 @@ import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
 
 /* ─── constants ───────────────────────────────────── */
-const ORDER_BY_LIST = [
-
-  'Admin User', 'John Smith', 'Sarah Johnson', 'Emma Davis',
-  'Mike Wilson', 'Mr. Sharma', 'Amlan Dikshit',
-];
-
 const INPUT_SX = {
   '& .MuiInputBase-input': { py: '6px', px: '8px', fontSize: '0.8rem' },
   '& .MuiOutlinedInput-root': { borderRadius: 1 },
@@ -240,7 +234,7 @@ export default function IndentManagementPage() {
   const partyGroups = useMemo(() => {
     if (!partyName) return [];
     const groups = products
-      .filter(p => p.supplierName === partyName)
+      .filter(p => p.vendorName === partyName)
       .map(p => p.groupName);
     return [...new Set(groups)];
   }, [partyName, products]);
@@ -250,7 +244,7 @@ export default function IndentManagementPage() {
     setValue('filterGroup', '');
     if (!partyName) { replace([]); return; }
     const items = products
-      .filter(p => p.supplierName === partyName)
+      .filter(p => p.vendorName === partyName)
       .map(p => ({
         _productId: p.id,
         groupName: p.groupName,
@@ -296,7 +290,7 @@ export default function IndentManagementPage() {
 
     setIsSubmitting(true);
     let imageUrl = '';
-    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    const folderId = import.meta.env.VITE_GOOGLE_FOLDER_INDENT;
 
     if (imageFile && folderId) {
       try {
@@ -447,7 +441,7 @@ export default function IndentManagementPage() {
                     error={!!errors.orderBy}
                     sx={INPUT_SX}
                   >
-                    {(orderByList && orderByList.length > 0 ? orderByList : ORDER_BY_LIST).map(o => (
+                    {orderByList.map(o => (
                       <MenuItem key={o} value={o}>{o}</MenuItem>
                     ))}
                   </TextField>
@@ -515,14 +509,14 @@ export default function IndentManagementPage() {
                 <Grid container spacing={2} mb={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>Filter by Group</Typography>
-                     <TextField
-                       {...reg('filterGroup')} select fullWidth size="small"
-                       value={watch('filterGroup') || ''}
-                       sx={{ ...INPUT_SX, bgcolor: isDark ? 'background.paper' : 'white' }}
-                     >
-                       <MenuItem value="">All Groups</MenuItem>
-                       {partyGroups.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-                     </TextField>
+                    <TextField
+                      {...reg('filterGroup')} select fullWidth size="small"
+                      value={watch('filterGroup') || ''}
+                      sx={{ ...INPUT_SX, bgcolor: isDark ? 'background.paper' : 'white' }}
+                    >
+                      <MenuItem value="">All Groups</MenuItem>
+                      {partyGroups.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                    </TextField>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>Search Item</Typography>
