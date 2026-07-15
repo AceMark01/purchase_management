@@ -84,17 +84,14 @@ export function mapCompanyRow(row, idx) {
 export function mapVendorRow(row, idx) {
   return {
     id: idx + 1,
-    _row: row._row || (idx + 3),
+    _row: row._row || (idx + 2),
+    vendorId: row["Vendor-ID"] || "",
     vendorName: row["Vendor Name"] || "",
-    gstNumber: row["GST Number"] || "",
-    email: row["Email Address"] || "",
-    phoneNumber: row["Phone Number"] || "",
-    responsibility: row["Responsibility"] || "",
     contactPerson: row["Contact Person Name"] || "",
+    phoneNumber: row["Phone Number"] || "",
+    email: row["Email Address"] || "",
+    gstNumber: row["GST Number"] || "",
     vendorLocation: row["Vendor Location"] || "",
-    status: row["Status"] || "Active",
-    createdDate: formatDateString(row["Created Date"]),
-    updatedDate: formatDateString(row["Updated Date"]),
   };
 }
 

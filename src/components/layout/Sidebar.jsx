@@ -56,7 +56,7 @@ const NAV_SECTIONS = [
     items: [
       { label: 'Company Master',         icon: ApartmentIcon,  path: '/master',   page: 'master' },
       { label: 'Product Data',           icon: BusinessCenterIcon, path: '/product-data', page: 'productData' },
-      { label: 'Vendor / Supplier',      icon: HandshakeIcon,  path: '/vendors',  page: 'vendors' },
+      { label: 'Vendor',                 icon: HandshakeIcon,  path: '/vendors',  page: 'vendors' },
     ],
   },
   {

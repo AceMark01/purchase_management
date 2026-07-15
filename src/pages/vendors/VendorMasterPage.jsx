@@ -13,7 +13,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { toast } from 'react-toastify';
@@ -37,10 +36,10 @@ function getComparator(order, orderBy) {
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
 function VendorForm({ open, onClose, editItem, onSave }) {
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
-      vendorName: '', gstNumber: '', email: '', phoneNumber: '',
-      responsibility: '', contactPerson: '', vendorLocation: '', status: 'Active',
+      vendorName: '', contactPerson: '', phoneNumber: '', email: '',
+      gstNumber: '', vendorLocation: '',
     },
   });
 
@@ -74,29 +73,14 @@ function VendorForm({ open, onClose, editItem, onSave }) {
         <DialogContent sx={{ pt: 2 }}>
           <Grid container spacing={2}>
             {/* Row 1 */}
-            <F name="vendorName" label="Vendor Name" sm={12} />
+            <F name="vendorName" label="Vendor Name" sm={6} />
+            <F name="contactPerson" label="Contact Person Name" sm={6} />
             {/* Row 2 */}
-            <F name="gstNumber" label="GST Number" sm={6} />
+            <F name="phoneNumber" label="Phone Number" sm={6} />
             <F name="email" label="Email Address" type="email" sm={6} />
             {/* Row 3 */}
-            <F name="phoneNumber" label="Phone Number" sm={6} />
-            <F name="responsibility" label="Responsibility" sm={6} />
-            {/* Row 4 */}
-            <F name="contactPerson" label="Contact Person Name" sm={6} />
+            <F name="gstNumber" label="GST Number" sm={6} />
             <F name="vendorLocation" label="Vendor Location" sm={6} />
-            {/* Row 5 */}
-            <Grid item xs={12} sm={4}>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <TextField {...field} select fullWidth size="small" label="Status">
-                    <MenuItem value="Active">Active</MenuItem>
-                    <MenuItem value="Inactive">Inactive</MenuItem>
-                  </TextField>
-                )}
-              />
-            </Grid>
           </Grid>
         </DialogContent>
         <Divider />
@@ -111,60 +95,21 @@ function VendorForm({ open, onClose, editItem, onSave }) {
   );
 }
 
-/* ── View Dialog ───────────────────────────────────────────── */
-function ViewDialog({ open, onClose, item }) {
-  if (!item) return null;
-  const rows = [
-    ['Vendor Name', item.vendorName],
-    ['GST Number', item.gstNumber],
-    ['Email', item.email],
-    ['Phone Number', item.phoneNumber],
-    ['Responsibility', item.responsibility],
-    ['Contact Person', item.contactPerson],
-    ['Vendor Location', item.vendorLocation],
-    ['Status', item.status],
-    ['Created Date', formatDate(item.createdDate)],
-    ['Updated Date', formatDate(item.updatedDate)],
-  ];
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-      <DialogTitle sx={{ fontWeight: 700 }}>Vendor Details — {item.vendorName}</DialogTitle>
-      <Divider />
-      <DialogContent sx={{ pt: 2 }}>
-        <Grid container spacing={1.5}>
-          {rows.map(([label, value]) => (
-            <Grid item xs={12} sm={6} key={label}>
-              <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
-              {label === 'Status'
-                ? <Chip label={value} size="small" color={value === 'Active' ? 'success' : 'default'} />
-                : <Typography variant="body2" fontWeight={500}>{value || '—'}</Typography>
-              }
-            </Grid>
-          ))}
-        </Grid>
-      </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
-    </Dialog>
-  );
-}
-
 /* ── Main Page ─────────────────────────────────────────────── */
 const TABLE_COLUMNS = [
+  { id: 'vendorId', label: 'Vendor ID', minWidth: 100 },
   { id: 'vendorName', label: 'Vendor Name', minWidth: 160 },
-  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
-  { id: 'email', label: 'Email', minWidth: 170 },
+  { id: 'contactPerson', label: 'Contact Person Name', minWidth: 160 },
   { id: 'phoneNumber', label: 'Phone Number', minWidth: 130 },
-  { id: 'contactPerson', label: 'Contact Person', minWidth: 140 },
-  { id: 'vendorLocation', label: 'Vendor Location', minWidth: 140 },
-  { id: 'status', label: 'Status', minWidth: 100 },
-  { id: 'createdDate', label: 'Created Date', minWidth: 120 },
+  { id: 'email', label: 'Email Address', minWidth: 170 },
+  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
+  { id: 'vendorLocation', label: 'Vendor Location', minWidth: 160 },
 ];
 
 export default function VendorMasterPage() {
   const { vendors: items = [], refresh, updateRow, loading } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
@@ -185,11 +130,12 @@ export default function VendorMasterPage() {
   const filtered = useMemo(() =>
     items.filter((v) =>
       !search ||
-      v.vendorName.toLowerCase().includes(search.toLowerCase()) ||
-      v.gstNumber.toLowerCase().includes(search.toLowerCase()) ||
-      v.email.toLowerCase().includes(search.toLowerCase()) ||
-      v.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-      v.vendorLocation.toLowerCase().includes(search.toLowerCase())
+      (v.vendorId || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.vendorName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.gstNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.contactPerson || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.vendorLocation || '').toLowerCase().includes(search.toLowerCase())
     ), [items, search]);
 
   const sorted = useMemo(() =>
@@ -204,37 +150,40 @@ export default function VendorMasterPage() {
     const isEdit = !!selected;
     try {
       let result;
-      const todayStr = formatDate(new Date());
-      const payload = {
-        "Vendor Name": data.vendorName,
-        "GST Number": data.gstNumber,
-        "Email Address": data.email,
-        "Phone Number": data.phoneNumber,
-        "Responsibility": data.responsibility,
-        "Contact Person Name": data.contactPerson,
-        "Vendor Location": data.vendorLocation,
-        "Status": data.status,
-        "Created Date": isEdit ? (selected.createdDate || todayStr) : todayStr,
-        "Updated Date": todayStr,
-      };
-
       if (isEdit) {
+        const payload = {
+          "Vendor-ID": selected.vendorId,
+          "Vendor Name": data.vendorName,
+          "Contact Person Name": data.contactPerson,
+          "Phone Number": data.phoneNumber,
+          "Email Address": data.email,
+          "GST Number": data.gstNumber,
+          "Vendor Location": data.vendorLocation,
+        };
         await updateRow('vendors', selected._row, payload);
         result = { success: true };
       } else {
+        let nextId = "VI-001";
+        if (items.length > 0) {
+          const ids = items
+            .map(item => {
+              const match = String(item.vendorId || '').match(/VI-(\d+)/);
+              return match ? parseInt(match[1], 10) : 0;
+            })
+            .filter(Boolean);
+          const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+          nextId = `VI-${String(maxId + 1).padStart(3, '0')}`;
+        }
         const rowValues = [
-          payload["Vendor Name"],
-          payload["GST Number"],
-          payload["Email Address"],
-          payload["Phone Number"],
-          payload["Responsibility"],
-          payload["Contact Person Name"],
-          payload["Vendor Location"],
-          payload["Status"],
-          payload["Created Date"],
-          payload["Updated Date"]
+          nextId,
+          data.vendorName,
+          data.contactPerson,
+          data.phoneNumber,
+          data.email,
+          data.gstNumber,
+          data.vendorLocation
         ];
-        result = await gasApi.insertInColumns("Master Data", 26, rowValues, 2);
+        result = await gasApi.insertInColumns("Master-Vendors", 1, rowValues, 1);
       }
 
       if (result.success) {
@@ -249,7 +198,7 @@ export default function VendorMasterPage() {
 
   const handleDelete = async () => {
     try {
-      const result = await gasApi.deleteRowInColumns("Master Data", selected._row, 26, 10);
+      const result = await gasApi.deleteRow("Master-Vendors", selected._row);
       if (result.success) {
         toast.success('Vendor deleted successfully!');
         await refresh();
@@ -266,7 +215,7 @@ export default function VendorMasterPage() {
   return (
     <Box>
       <PageHeader
-        title="Vendor / Supplier Master"
+        title="Vendor Master"
         subtitle={`${filtered.length} vendors`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Vendor Master' }]}
         actions={
@@ -381,11 +330,6 @@ export default function VendorMasterPage() {
                 <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                   <TableCell>
                     <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="View">
-                        <IconButton size="small" color="info" onClick={() => { setSelected(row); setViewOpen(true); }}>
-                          <VisibilityIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
                       <Tooltip title="Edit">
                         <IconButton size="small" color="primary" onClick={() => { setSelected(row); setFormOpen(true); }}>
                           <EditIcon sx={{ fontSize: 16 }} />
@@ -398,18 +342,13 @@ export default function VendorMasterPage() {
                       </Tooltip>
                     </Stack>
                   </TableCell>
+                  {visibleCols.has('vendorId') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.vendorId}</TableCell>}
                   {visibleCols.has('vendorName') && <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.vendorName}</TableCell>}
-                  {visibleCols.has('gstNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>}
-                  {visibleCols.has('email') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>}
-                  {visibleCols.has('phoneNumber') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>}
                   {visibleCols.has('contactPerson') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.contactPerson}</TableCell>}
+                  {visibleCols.has('phoneNumber') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>}
+                  {visibleCols.has('email') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>}
+                  {visibleCols.has('gstNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>}
                   {visibleCols.has('vendorLocation') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.vendorLocation}</TableCell>}
-                  {visibleCols.has('status') && (
-                    <TableCell>
-                      <Chip label={row.status} size="small" color={row.status === 'Active' ? 'success' : 'default'} sx={{ fontWeight: 600, fontSize: '0.72rem', height: 22 }} />
-                    </TableCell>
-                  )}
-                  {visibleCols.has('createdDate') && <TableCell sx={{ fontSize: '0.78rem' }}>{formatDate(row.createdDate)}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>
@@ -434,7 +373,6 @@ export default function VendorMasterPage() {
           onSave={handleSave}
         />
       )}
-      <ViewDialog open={viewOpen} onClose={() => { setViewOpen(false); setSelected(null); }} item={selected} />
       <ConfirmDialog
         open={deleteOpen}
         onConfirm={handleDelete}

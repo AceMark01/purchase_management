@@ -30,7 +30,7 @@ const PAGES = [
   { key: 'tallyEntry',      label: 'Tally Entry' },
   { key: 'master',          label: 'Company Master' },
   { key: 'productData',     label: 'Product Data' },
-  { key: 'vendors',         label: 'Vendor / Supplier' },
+  { key: 'vendors',         label: 'Vendor' },
   { key: 'settings',        label: 'Settings' },
 ];
 

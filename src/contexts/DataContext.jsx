@@ -81,8 +81,7 @@ const SHEET_MAP = {
   "receiving": "RECEIVED-ACCOUNTS",
   "products": "Master Data",
   "companies": "Master Data",
-  "vendors": "Master Data",
-  "masterData": "Master Data",
+  "vendors": "Master-Vendors",
   "users": "LOGIN",
   "whatsapp": "Whatsapp Form",
   "poSentStatus": "PO Sent Status",
@@ -188,6 +187,7 @@ export function DataProvider({ children }) {
   const [rawApprovals, setRawApprovals] = useState([]);
   const [rawFollowUps, setRawFollowUps] = useState([]);
   const [rawMasterData, setRawMasterData] = useState([]);
+  const [rawVendorsData, setRawVendorsData] = useState([]);
   const [rawUsers, setRawUsers] = useState([]);
   const [rawWhatsapp, setRawWhatsapp] = useState([]);
   const [rawPoSentStatus, setRawPoSentStatus] = useState([]);
@@ -213,7 +213,8 @@ export function DataProvider({ children }) {
           { key: "logistics", name: "LIFT-RECEIVED" },
           { key: "receiving", name: "RECEIVED-ACCOUNTS" },
           { key: "masterData", name: "Master Data" },
-          { key: "users", name: "LOGIN" }
+          { key: "users", name: "LOGIN" },
+          { key: "vendorsData", name: "Master-Vendors" }
         ];
 
         const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
@@ -236,6 +237,7 @@ export function DataProvider({ children }) {
       const logisticsRaw = fetchedData.logistics !== undefined ? fetchedData.logistics : rawLogistics2D;
       const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving2D;
       const masterDataRaw = fetchedData.masterData !== undefined ? fetchedData.masterData : rawMasterData;
+      const vendorsDataRaw = fetchedData.vendorsData !== undefined ? fetchedData.vendorsData : rawVendorsData;
       const usersRaw = fetchedData.users !== undefined ? fetchedData.users : rawUsers;
       const whatsappRaw = fetchedData.whatsapp !== undefined ? fetchedData.whatsapp : rawWhatsapp;
       const poSentStatusRaw = fetchedData.poSentStatus !== undefined ? fetchedData.poSentStatus : rawPoSentStatus;
@@ -260,6 +262,7 @@ export function DataProvider({ children }) {
       if (fetchedData.logistics !== undefined || !sheetsToFetch) setRawLogistics2D(logisticsRaw);
       if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving2D(receivingRaw);
       if (fetchedData.masterData !== undefined || !sheetsToFetch) setRawMasterData(masterDataRaw);
+      if (fetchedData.vendorsData !== undefined || !sheetsToFetch) setRawVendorsData(vendorsDataRaw);
       if (fetchedData.users !== undefined || !sheetsToFetch) setRawUsers(usersRaw);
       if (fetchedData.whatsapp !== undefined || !sheetsToFetch) setRawWhatsapp(whatsappRaw);
       if (fetchedData.poSentStatus !== undefined || !sheetsToFetch) setRawPoSentStatus(poSentStatusRaw);
@@ -306,11 +309,11 @@ export function DataProvider({ children }) {
       })).filter(r => r["Company Name"] && String(r["Company Name"]).trim() !== "");
       const mappedCompanies = companiesObj.map((row, idx) => mapCompanyRow(row, idx));
 
-      // Vendors: columns Z-AI (25-34)
-      const vendorHeaders = (masterDataRaw[1] || []).slice(25, 35).map(h => String(h || "").trim());
-      const vendorsObj = masterDataRaw.slice(2).map((row, idx) => ({
-        _row: idx + 3,
-        ...sliceRowToObj(row, vendorHeaders, 25)
+      // Vendors: from "Master-Vendors" sheet, header row = 1, columns A-G
+      const vendorHeaders = (vendorsDataRaw[0] || []).map(h => String(h || "").trim());
+      const vendorsObj = vendorsDataRaw.slice(1).map((row, idx) => ({
+        _row: idx + 2,
+        ...sliceRowToObj(row, vendorHeaders, 0)
       })).filter(r => r["Vendor Name"] && String(r["Vendor Name"]).trim() !== "");
       const mappedVendors = vendorsObj.map((row, idx) => mapVendorRow(row, idx));
 
@@ -586,7 +589,7 @@ export function DataProvider({ children }) {
     if (resource === "companies") {
       colOffset = 12;
     } else if (resource === "vendors") {
-      colOffset = 25;
+      colOffset = 0;
     } else if (resource === "products") {
       colOffset = 0;
     }
