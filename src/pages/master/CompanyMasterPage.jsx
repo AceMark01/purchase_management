@@ -6,7 +6,7 @@ import {
   Grid, TextField, MenuItem, Typography, Divider, Chip, Stack,
   Card, CardContent, InputAdornment, IconButton, Tooltip,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
-  TablePagination, TableSortLabel, Paper,
+  TablePagination, TableSortLabel, Paper, Menu, Checkbox, FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -15,6 +15,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BusinessIcon from '@mui/icons-material/Business';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -202,6 +203,8 @@ export default function CompanyMasterPage() {
   const [orderBy, setOrderBy] = useState('companyName');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [visibleCols, setVisibleCols] = useState(() => new Set(TABLE_COLUMNS.map(c => c.id)));
+  const [colMenuAnchor, setColMenuAnchor] = useState(null);
 
   const handleSort = (col) => {
     const isAsc = orderBy === col && order === 'asc';
@@ -329,6 +332,37 @@ export default function CompanyMasterPage() {
               }}
             />
             <Typography variant="body2" color="text.secondary">{filtered.length} results</Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <Tooltip title="Toggle columns" arrow>
+              <IconButton size="small" onClick={e => setColMenuAnchor(e.currentTarget)}
+                sx={{ width: 30, height: 30, borderRadius: '8px', border: 1, borderColor: 'divider', color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' } }}
+              >
+                <ViewColumnIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={colMenuAnchor} open={Boolean(colMenuAnchor)} onClose={() => setColMenuAnchor(null)}
+              PaperProps={{ sx: { minWidth: 180, py: 0.5 } }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              disableScrollLock
+            >
+              <Typography variant="caption" sx={{ px: 2, py: 0.5, display: 'block', color: 'text.disabled', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Columns
+              </Typography>
+              {TABLE_COLUMNS.map((c) => (
+                <MenuItem key={c.id} dense
+                  onClick={() => setVisibleCols((prev) => { const next = new Set(prev); next.has(c.id) ? next.delete(c.id) : next.add(c.id); return next; })}
+                  sx={{ py: 0.5, mx: 0.5, borderRadius: 1 }}
+                >
+                  <FormControlLabel
+                    control={<Checkbox checked={visibleCols.has(c.id)} size="small" sx={{ py: 0 }} />}
+                    label={<Typography variant="body2">{c.label}</Typography>}
+                    sx={{ m: 0, width: '100%' }}
+                  />
+                </MenuItem>
+              ))}
+            </Menu>
           </Stack>
         </CardContent>
       </Card>
@@ -339,7 +373,7 @@ export default function CompanyMasterPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'background.default', minWidth: 130 }}>Actions</TableCell>
-                {TABLE_COLUMNS.map((col) => (
+                {TABLE_COLUMNS.filter(col => visibleCols.has(col.id)).map((col) => (
                   <TableCell
                     key={col.id}
                     sx={{ fontWeight: 700, fontSize: '0.75rem', whiteSpace: 'nowrap', minWidth: col.minWidth, bgcolor: 'background.default' }}
@@ -359,7 +393,7 @@ export default function CompanyMasterPage() {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={TABLE_COLUMNS.length + 1} align="center" sx={{ py: 4, color: 'text.disabled' }}>
+                  <TableCell colSpan={visibleCols.size + 1} align="center" sx={{ py: 4, color: 'text.disabled' }}>
                     <Stack sx={{ alignItems: 'center' }} spacing={1}>
                       <BusinessIcon sx={{ fontSize: 40, opacity: 0.3 }} />
                       <Typography variant="body2">No companies found</Typography>
@@ -375,17 +409,19 @@ export default function CompanyMasterPage() {
                       <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => { setSelected(row); setDeleteOpen(true); }}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.companyName}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.panNumber}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem' }}>{row.responsiblePerson}</TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem' }}>{row.destination}</TableCell>
-                  <TableCell>
-                    <Chip label={row.status} size="small" color={row.status === 'Active' ? 'success' : 'default'} />
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '0.78rem' }}>{formatDate(row.createdDate)}</TableCell>
+                  {visibleCols.has('companyName') && <TableCell sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.companyName}</TableCell>}
+                  {visibleCols.has('gstNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.gstNumber}</TableCell>}
+                  {visibleCols.has('panNumber') && <TableCell sx={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{row.panNumber}</TableCell>}
+                  {visibleCols.has('email') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.email}</TableCell>}
+                  {visibleCols.has('phoneNumber') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.phoneNumber}</TableCell>}
+                  {visibleCols.has('responsiblePerson') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.responsiblePerson}</TableCell>}
+                  {visibleCols.has('destination') && <TableCell sx={{ fontSize: '0.78rem' }}>{row.destination}</TableCell>}
+                  {visibleCols.has('status') && (
+                    <TableCell>
+                      <Chip label={row.status} size="small" color={row.status === 'Active' ? 'success' : 'default'} sx={{ fontWeight: 600, fontSize: '0.72rem', height: 22 }} />
+                    </TableCell>
+                  )}
+                  {visibleCols.has('createdDate') && <TableCell sx={{ fontSize: '0.78rem' }}>{formatDate(row.createdDate)}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>

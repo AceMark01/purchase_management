@@ -5,7 +5,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { gasApi } from '../services/gasApi';
 import { useAuth } from './AuthContext';
-import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVendorRow, mapUserRow, mapSettingsRow } from '../services/dataMapper';
+import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVendorRow, mapUserRow } from '../services/dataMapper';
 import { setRecords } from '../store/slices/workflowSlice';
 import { setVendors } from '../store/slices/vendorSlice';
 import { setCompanies } from '../store/slices/companySlice';
@@ -180,7 +180,6 @@ export function DataProvider({ children }) {
   const [companiesState, setCompaniesState] = useState([]);
   const [whatsappEntries, setWhatsappEntries] = useState([]);
   const [usersState, setUsersState] = useState([]);
-  const [settingsState, setSettingsState] = useState([]);
   const [rawReceiving, setRawReceiving] = useState([]);
   const [rawLogistics, setRawLogistics] = useState([]);
   const [rawReceiving2D, setRawReceiving2D] = useState([]);
@@ -329,46 +328,12 @@ export function DataProvider({ children }) {
         email: row["USERNAME"] || "",
         password: row["PASSWORD"] || "",
         role: String(row["ROLE"] || "user").toLowerCase(),
+        pageAccess: row["PAGE-ACCESS"] || "",
         department: String(row["ROLE"] || "").toLowerCase() === 'admin' ? 'Management' : 'Procurement',
         status: 'active',
         lastLogin: ''
       }));
 
-      // Settings: Loaded dynamically from localStorage/default configs
-      let currentPerms = {};
-      try {
-        const saved = localStorage.getItem('pms_settings_perms');
-        if (saved) currentPerms = JSON.parse(saved);
-      } catch (e) {}
-
-      const defaultPages = {
-        admin: [
-          'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
-          'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
-          'userManagement', 'settings', 'reports', 'master', 'vendors',
-        ],
-        user: [
-          'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
-          'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
-          'master', 'vendors',
-        ]
-      };
-
-      const mappedSettings = ['admin', 'user'].map((role, idx) => ({
-        id: idx + 1,
-        _row: idx + 1,
-        role: role,
-        pages: currentPerms[role]?.pages || defaultPages[role],
-        actions: currentPerms[role]?.actions || {
-          create: true,
-          read: true,
-          update: true,
-          delete: role === 'admin',
-          export: true,
-          print: true,
-        }
-      }));
-      setSettingsState(mappedSettings);
 
       const fullHeaders = (masterDataRaw[1] || []).map(h => String(h || "").trim());
       setHeadersState({
@@ -675,38 +640,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  const updateSettingsRow = async (rowIndex, roleData, updatedBy) => {
-    setWriteLoading(true);
-    try {
-      let currentPerms = {};
-      try {
-        const saved = localStorage.getItem('pms_settings_perms');
-        if (saved) currentPerms = JSON.parse(saved);
-      } catch (e) {}
-
-      currentPerms[roleData.role] = {
-        pages: roleData.pages,
-        actions: roleData.actions
-      };
-
-      localStorage.setItem('pms_settings_perms', JSON.stringify(currentPerms));
-
-      setSettingsState(prev => prev.map(s => {
-        if (s.role === roleData.role) {
-          return {
-            ...s,
-            pages: roleData.pages,
-            actions: roleData.actions
-          };
-        }
-        return s;
-      }));
-
-      return { success: true };
-    } finally {
-      setWriteLoading(false);
-    }
-  };
 
   return (
     <DataContext.Provider
@@ -717,14 +650,12 @@ export function DataProvider({ children }) {
         companies: companiesState,
         whatsappEntries,
         users: usersState,
-        settings: settingsState,
         receiving: rawReceiving,
         logistics: rawLogistics,
         headers: headersState,
         refresh,
         updateRow,
         addRow,
-        updateSettingsRow,
         poHistoryRecords,
         pendingPoRecords,
         orderByList: orderByListState

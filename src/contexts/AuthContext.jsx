@@ -4,14 +4,13 @@ import { gasApi } from '../services/gasApi';
 const AuthContext = createContext(null);
 
 const ADMIN_PAGES = [
-  'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
-  'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
-  'userManagement', 'settings', 'reports', 'master', 'vendors',
+  'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
+  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
+  'settings',
 ];
 const USER_PAGES = [
-  'dashboard', 'indent', 'whatsapp', 'purchaseOrder', 'followUp', 'logistics',
-  'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry',
-  'master', 'vendors',
+  'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
+  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
 ];
 
 
@@ -34,30 +33,6 @@ export function AuthProvider({ children }) {
     }
   });
 
-  const getDefaultPermissions = (role) => {
-    try {
-      const savedSettings = localStorage.getItem('pms_settings_perms');
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        if (parsed[role]) {
-          return parsed[role];
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return {
-      pages: role === 'admin' ? ADMIN_PAGES : USER_PAGES,
-      actions: {
-        create: true,
-        read: true,
-        update: true,
-        delete: role === 'admin',
-        export: true,
-        print: true,
-      },
-    };
-  };
 
   const login = async (username, password) => {
     try {

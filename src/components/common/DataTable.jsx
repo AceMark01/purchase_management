@@ -6,12 +6,8 @@ import {
   FormControlLabel, Typography, Skeleton, alpha, useTheme, useMediaQuery,
 } from '@mui/material';
 import SearchIcon       from '@mui/icons-material/Search';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import PrintIcon        from '@mui/icons-material/Print';
 import ViewColumnIcon   from '@mui/icons-material/ViewColumn';
 import TableRowsIcon    from '@mui/icons-material/TableRows';
-import { exportToExcel, exportToPDF, printTable } from '../../utils/exportUtils';
 import { statusColor } from '../../utils/formatters';
 import { useData } from '../../contexts/DataContext';
 
@@ -242,15 +238,6 @@ export default function DataTable({
         <Box sx={{ flex: 1 }} />
 
         <Stack direction="row" spacing={0.5}>
-          <ToolBtn title="Export Excel" color="#059669" onClick={() => exportToExcel(filtered, exportCols, title)}>
-            <FileDownloadIcon sx={{ fontSize: 15 }} />
-          </ToolBtn>
-          <ToolBtn title="Export PDF" color="#dc2626" onClick={() => exportToPDF(filtered, exportCols, title, title)}>
-            <PictureAsPdfIcon sx={{ fontSize: 15 }} />
-          </ToolBtn>
-          <ToolBtn title="Print" onClick={() => printTable(filtered, exportCols, title)}>
-            <PrintIcon sx={{ fontSize: 15 }} />
-          </ToolBtn>
           {!isMobile && (
             <ToolBtn title="Toggle columns" onClick={(e) => setColMenuAnchor(e.currentTarget)}>
               <ViewColumnIcon sx={{ fontSize: 15 }} />

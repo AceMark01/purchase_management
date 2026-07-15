@@ -27,51 +27,51 @@ const TransparentInput = ({ readOnly, ...props }) => (
       readOnly: readOnly || false,
       style: { fontSize: '0.7rem', fontWeight: 600, padding: 0, cursor: readOnly ? 'default' : 'text', color: '#000' }
     }}
-    sx={{ 
-      '& .MuiInputBase-input': { 
-        padding: 0, 
+    sx={{
+      '& .MuiInputBase-input': {
+        padding: 0,
         height: 'auto',
         color: '#000 !important',
         WebkitTextFillColor: '#000 !important'
-      } 
+      }
     }}
     {...props}
   />
 );
 
 export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowIds = [] }) {
-  const dispatch   = useDispatch();
+  const dispatch = useDispatch();
   const [submitting, setSubmitting] = useState(false);
-  const vendors    = useSelector((state) => state.vendorMaster.items) || [];
-  const companies  = useSelector((state) => state.companies.items)    || [];
-  const allRecords = useSelector((state) => state.workflow.records)   || [];
+  const vendors = useSelector((state) => state.vendorMaster.items) || [];
+  const companies = useSelector((state) => state.companies.items) || [];
+  const allRecords = useSelector((state) => state.workflow.records) || [];
   const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [] } = useData();
 
   const { control, register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
-      poNumber:           generatePONumber(),
-      poDate:             new Date().toISOString().slice(0, 10),
-      supplierId:         '',
-      vendorName:         '',
-      vendorGst:          '',
-      vendorAddress:      '',
-      companyId:          '',
-      companyName:        'Acemark Stationers',
-      companyGst:         '',
-      companyPan:         '',
-      billingAddress:     '',
+      poNumber: generatePONumber(),
+      poDate: new Date().toISOString().slice(0, 10),
+      supplierId: '',
+      vendorName: '',
+      vendorGst: '',
+      vendorAddress: '',
+      companyId: '',
+      companyName: 'Acemark Stationers',
+      companyGst: '',
+      companyPan: '',
+      billingAddress: '',
       destinationAddress: '',
-      items:              [],
-      priceBasis:         'F.O.R. Destination',
-      taxesDuties:        'GST Extra as applicable',
-      delivery:           'Within 2-3 Weeks from PO date',
-      transport:          'By Supplier',
-      paymentTerms:       '30 Days credit',
-      dispatchDate:       '',
+      items: [],
+      priceBasis: 'F.O.R. Destination',
+      taxesDuties: 'GST Extra as applicable',
+      delivery: 'Within 2-3 Weeks from PO date',
+      transport: 'By Supplier',
+      paymentTerms: '30 Days credit',
+      dispatchDate: '',
     }
   });
 
-  const isViewMode  = !!viewRecord;
+  const isViewMode = !!viewRecord;
 
   // Auto-select supplier if selectedRowIds are passed from parent
   useEffect(() => {
@@ -109,74 +109,74 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     if (viewRecord.poNumber) {
       // Find all rows in poHistoryRecords that belong to this PO
       const poGroup = poHistoryRecords.filter(r => r.poNumber && r.poNumber.toLowerCase() === viewRecord.poNumber.toLowerCase());
-      
-      setValue('poNumber',  viewRecord.poNumber || '');
-      setValue('poDate',    viewRecord.timestamp ? new Date(viewRecord.timestamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+
+      setValue('poNumber', viewRecord.poNumber || '');
+      setValue('poDate', viewRecord.timestamp ? new Date(viewRecord.timestamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
       setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId',   ven.id);
-        setValue('vendorGst',    ven.gstNumber      || '');
+        setValue('supplierId', ven.id);
+        setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
 
       const comp = companies.find(c => c.companyName === viewRecord.companyName);
       if (comp) {
-        setValue('companyId',          comp.id);
-        setValue('companyGst',         comp.gstNumber      || '');
-        setValue('companyPan',         comp.panNumber      || '');
-        setValue('billingAddress',     comp.billingAddress || '');
-        setValue('destinationAddress', comp.destination    || '');
+        setValue('companyId', comp.id);
+        setValue('companyGst', comp.gstNumber || '');
+        setValue('companyPan', comp.panNumber || '');
+        setValue('billingAddress', comp.billingAddress || '');
+        setValue('destinationAddress', comp.destination || '');
       }
 
       replace(poGroup.map((item, idx) => ({
-        sno:          idx + 1,
+        sno: idx + 1,
         indentNumber: item.indentNumber || '',
-        itemCode:     item.itemCode     || '',
-        groupName:    item.groupName    || '',
-        description:  item.itemName     || '',
-        quantity:     item.quantity     || 0,
-        unit:         item.unit         || '',
-        rate:         item.rate         || 0,
-        discount:     item.discount     || 0,
-        gst:          item.gst          || 0,
+        itemCode: item.itemCode || '',
+        groupName: item.groupName || '',
+        description: item.itemName || '',
+        quantity: item.quantity || 0,
+        unit: item.unit || '',
+        rate: item.rate || 0,
+        discount: item.discount || 0,
+        gst: item.gst || 0,
       })));
     } else {
       // Fallback for older records without poDetails
-      setValue('poNumber',  viewRecord.poNumber || '');
-      setValue('poDate',    viewRecord.poDate   || new Date().toISOString().slice(0, 10));
-      setValue('vendorName', viewRecord.partyName   || '');
+      setValue('poNumber', viewRecord.poNumber || '');
+      setValue('poDate', viewRecord.poDate || new Date().toISOString().slice(0, 10));
+      setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId',   ven.id);
-        setValue('vendorGst',    ven.gstNumber      || '');
+        setValue('supplierId', ven.id);
+        setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
 
       const comp = companies.find(c => c.companyName === viewRecord.companyName);
       if (comp) {
-        setValue('companyId',          comp.id);
-        setValue('companyGst',         comp.gstNumber      || '');
-        setValue('companyPan',         comp.panNumber      || '');
-        setValue('billingAddress',     comp.billingAddress || '');
-        setValue('destinationAddress', comp.destination    || '');
+        setValue('companyId', comp.id);
+        setValue('companyGst', comp.gstNumber || '');
+        setValue('companyPan', comp.panNumber || '');
+        setValue('billingAddress', comp.billingAddress || '');
+        setValue('destinationAddress', comp.destination || '');
       }
 
       replace([{
-        sno:          1,
+        sno: 1,
         indentNumber: viewRecord.indentNumber || '',
-        itemCode:     viewRecord.itemCode     || '',
-        groupName:    viewRecord.groupName    || '',
-        description:  viewRecord.itemName     ? `${viewRecord.itemName} - ${viewRecord.description || ''}` : '',
-        quantity:     viewRecord.quantity     || 0,
-        unit:         viewRecord.unit         || '',
-        rate:         viewRecord.rate         || 0,
-        discount:     viewRecord.discount     || 0,
-        gst:          viewRecord.gst          || 0,
+        itemCode: viewRecord.itemCode || '',
+        groupName: viewRecord.groupName || '',
+        description: viewRecord.itemName ? `${viewRecord.itemName} - ${viewRecord.description || ''}` : '',
+        quantity: viewRecord.quantity || 0,
+        unit: viewRecord.unit || '',
+        rate: viewRecord.rate || 0,
+        discount: viewRecord.discount || 0,
+        gst: viewRecord.gst || 0,
       }]);
     }
   }, [isViewMode, viewRecord, setValue, replace, vendors, companies, poHistoryRecords]);
@@ -190,14 +190,14 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     const ven = vendors.find(v => v.id === selectedSupplierId);
     if (!ven) return;
 
-    setValue('vendorName',    ven.vendorName     || '');
-    setValue('vendorGst',     ven.gstNumber      || '');
+    setValue('vendorName', ven.vendorName || '');
+    setValue('vendorGst', ven.gstNumber || '');
     setValue('vendorAddress', ven.vendorLocation || 'Not available');
 
     // Batch pending indents for this supplier (filter by selectedRowIds if provided)
     const matchedIndents = pendingPoRecords.filter(
       r => r.partyName === ven.vendorName &&
-           (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
+        (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
     if (matchedIndents.length === 0) {
@@ -211,26 +211,26 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     // Auto-fill company from first matched indent
     const comp = companies.find(c => c.companyName === matchedIndents[0].companyName);
     if (comp) {
-      setValue('companyId',          comp.id);
-      setValue('companyName',        comp.companyName);
-      setValue('companyGst',         comp.gstNumber      || '');
-      setValue('companyPan',         comp.panNumber      || '');
-      setValue('billingAddress',     comp.billingAddress || '');
-      setValue('destinationAddress', comp.destination    || '');
+      setValue('companyId', comp.id);
+      setValue('companyName', comp.companyName);
+      setValue('companyGst', comp.gstNumber || '');
+      setValue('companyPan', comp.panNumber || '');
+      setValue('billingAddress', comp.billingAddress || '');
+      setValue('destinationAddress', comp.destination || '');
     }
 
     // Build items — include indentNumber and groupName per row
     replace(matchedIndents.map((ind, idx) => ({
-      sno:          idx + 1,
+      sno: idx + 1,
       indentNumber: ind.indentNumber || '',
-      itemCode:     ind.itemCode     || '',
-      groupName:    ind.groupName    || '',
-      description:  ind.itemName     || '',
-      quantity:     ind.quantity     || 0,
-      unit:         ind.unit         || '',
-      rate:         ind.rate         || 0,
-      discount:     ind.discount     || 0,
-      gst:          ind.gst          || 0,
+      itemCode: ind.itemCode || '',
+      groupName: ind.groupName || '',
+      description: ind.itemName || '',
+      quantity: ind.quantity || 0,
+      unit: ind.unit || '',
+      rate: ind.rate || 0,
+      discount: ind.discount || 0,
+      gst: ind.gst || 0,
     })));
   }, [selectedSupplierId, vendors, pendingPoRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
 
@@ -241,20 +241,20 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   useEffect(() => {
     let sub = 0, gstAmt = 0;
     (watchItems || []).forEach((item) => {
-      const q   = parseFloat(item.quantity) || 0;
-      const r   = parseFloat(item.rate)     || 0;
-      const d   = parseFloat(item.discount) || 0;
-      const g   = parseFloat(item.gst)      || 0;
+      const q = parseFloat(item.quantity) || 0;
+      const r = parseFloat(item.rate) || 0;
+      const d = parseFloat(item.discount) || 0;
+      const g = parseFloat(item.gst) || 0;
       const afterDiscount = q * r * (1 - d / 100);
-      sub    += afterDiscount;
+      sub += afterDiscount;
       gstAmt += afterDiscount * (g / 100);
     });
     setTotals({ grandTotal: sub + gstAmt });
   }, [watchItems]);
 
-  const data          = watch();
+  const data = watch();
   const emptyRowsCount = 1;
-  const emptyRows      = Array.from({ length: emptyRowsCount });
+  const emptyRows = Array.from({ length: emptyRowsCount });
 
   // ── Save & Submit ─────────────────────────────────────────────────────
   const onSubmit = async () => {
@@ -266,7 +266,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
     const matchedIndents = pendingPoRecords.filter(
       r => r.partyName === data.vendorName &&
-           (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
+        (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
     );
 
     if (matchedIndents.length === 0) { toast.error('No pending indents to process.'); return; }
@@ -285,7 +285,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         logging: false
       });
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      
+
       // Proportional dimensions matching the container aspect ratio
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -314,14 +314,14 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       const historyRows = [];
       for (const indent of matchedIndents) {
         const matchedFormItem = data.items?.find(
-          it => it.indentNumber === indent.indentNumber && 
-                it.itemCode === indent.itemCode
+          it => it.indentNumber === indent.indentNumber &&
+            it.itemCode === indent.itemCode
         );
         const poQty = matchedFormItem ? parseFloat(matchedFormItem.quantity) : indent.quantity;
         const poRate = matchedFormItem ? parseFloat(matchedFormItem.rate) : indent.rate;
         const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
         const poGst = matchedFormItem ? parseFloat(matchedFormItem.gst) : indent.gst;
-        
+
         const afterDiscount = poQty * poRate * (1 - poDiscount / 100);
         const discounted = afterDiscount;
         const total = afterDiscount * (1 + poGst / 100);
@@ -382,11 +382,11 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={submitting}>Print</Button>
           {!isViewMode && (
-            <Button 
-              variant="contained" 
-              size="small" 
-              color="primary" 
-              startIcon={<SaveIcon />} 
+            <Button
+              variant="contained"
+              size="small"
+              color="primary"
+              startIcon={<SaveIcon />}
               onClick={handleSubmit(onSubmit)}
               disabled={submitting}
             >
@@ -399,7 +399,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       {/* ── Printable PO Template ──────────────────────────────────────── */}
       <DialogContent sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fff', '@media print': { p: 0 } }}>
-        <Box 
+        <Box
           id="printable-po-content"
           sx={{
             maxWidth: '900px', mx: 'auto', border: '2px solid #000',
@@ -546,10 +546,10 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             </thead>
             <tbody>
               {data.items.map((item, idx) => {
-                const q   = parseFloat(item.quantity) || 0;
-                const r   = parseFloat(item.rate)     || 0;
-                const d   = parseFloat(item.discount) || 0;
-                const g   = parseFloat(item.gst)      || 0;
+                const q = parseFloat(item.quantity) || 0;
+                const r = parseFloat(item.rate) || 0;
+                const d = parseFloat(item.discount) || 0;
+                const g = parseFloat(item.gst) || 0;
                 const afterDiscount = q * r * (1 - d / 100);
                 const totalWithGst = afterDiscount * (1 + g / 100);
                 return (

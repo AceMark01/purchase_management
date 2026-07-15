@@ -112,39 +112,7 @@ export function mapUserRow(row, idx) {
   };
 }
 
-export function mapSettingsRow(row, idx) {
-  const parseBool = (v) => String(v || '').trim().toUpperCase() === 'TRUE';
-  const pages = [];
-  if (parseBool(row["Page_Dashboard"])) pages.push('dashboard');
-  if (parseBool(row["Page_Indent"])) pages.push('indent');
-  if (parseBool(row["Page_PurchaseOrder"])) pages.push('purchaseOrder');
-  if (parseBool(row["Page_FollowUp"])) pages.push('followUp');
-  if (parseBool(row["Page_Logistics"])) pages.push('logistics');
-  if (parseBool(row["Page_Lifting"])) pages.push('lifting');
-  if (parseBool(row["Page_ReceiveMaterial"])) pages.push('receiveMaterial');
-  if (parseBool(row["Page_LiftReceiver"])) pages.push('liftReceiver');
-  if (parseBool(row["Page_TallyEntry"])) pages.push('tallyEntry');
-  if (parseBool(row["Page_Reports"])) pages.push('reports');
-  if (parseBool(row["Page_UserManagement"])) pages.push('userManagement');
-  if (parseBool(row["Page_Settings"])) pages.push('settings');
 
-  return {
-    id: idx + 1,
-    _row: row._row || (idx + 3),
-    role: String(row["Role"] || '').trim().toLowerCase(),
-    pages,
-    actions: {
-      create: parseBool(row["Action_Create"]),
-      read: parseBool(row["Action_Read"]),
-      update: parseBool(row["Action_Update"]),
-      delete: parseBool(row["Action_Delete"]),
-      export: parseBool(row["Action_Export"]),
-      print: parseBool(row["Action_Print"]),
-    },
-    lastUpdated: row["Last_Updated"] || "",
-    updatedBy: row["Updated_By"] || "",
-  };
-}
 
 
 /**

@@ -6,7 +6,7 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Paper, IconButton, Divider, alpha, useTheme, Chip, InputAdornment, Tooltip,
   TablePagination, Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Stack,
+  CircularProgress, Stack, Menu, Checkbox, FormControlLabel,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -15,12 +15,11 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddIcon from '@mui/icons-material/Add';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import SearchIcon from '@mui/icons-material/Search';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { toast } from 'react-toastify';
 import { formatDate, generateIndentNumber, formatTimestamp } from '../../utils/formatters';
 import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
-import { exportToExcel } from '../../utils/exportUtils';
 
 /* ─── constants ───────────────────────────────────── */
 const ORDER_BY_LIST = [
@@ -76,6 +75,8 @@ function IndentListTable({ rows }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [visibleCols, setVisibleCols] = useState(() => new Set(LIST_COLS.map(c => c.key)));
+  const [colMenuAnchor, setColMenuAnchor] = useState(null);
 
   const filtered = useMemo(() => {
     if (!search) return rows;
@@ -86,8 +87,6 @@ function IndentListTable({ rows }) {
   }, [rows, search]);
 
   const paginated = filtered.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
-
-  const exportCols = LIST_COLS.map(c => ({ key: c.key, header: c.label }));
 
   return (
     <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
@@ -111,13 +110,36 @@ function IndentListTable({ rows }) {
             '& .MuiOutlinedInput-input': { py: 0 },
           }}
         />
-        <Tooltip title="Export Excel" arrow>
-          <IconButton size="small" onClick={() => exportToExcel(filtered, exportCols, 'Indent List')}
-            sx={{ width: 30, height: 30, borderRadius: '8px', border: 1, borderColor: 'divider', color: '#059669', '&:hover': { bgcolor: 'action.hover' } }}
+        <Tooltip title="Toggle columns" arrow>
+          <IconButton size="small" onClick={e => setColMenuAnchor(e.currentTarget)}
+            sx={{ width: 30, height: 30, borderRadius: '8px', border: 1, borderColor: 'divider', color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' } }}
           >
-            <FileDownloadIcon sx={{ fontSize: 15 }} />
+            <ViewColumnIcon sx={{ fontSize: 15 }} />
           </IconButton>
         </Tooltip>
+        <Menu
+          anchorEl={colMenuAnchor} open={Boolean(colMenuAnchor)} onClose={() => setColMenuAnchor(null)}
+          PaperProps={{ sx: { minWidth: 180, py: 0.5 } }}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          disableScrollLock
+        >
+          <Typography variant="caption" sx={{ px: 2, py: 0.5, display: 'block', color: 'text.disabled', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Columns
+          </Typography>
+          {LIST_COLS.map((c) => (
+            <MenuItem key={c.key} dense
+              onClick={() => setVisibleCols((prev) => { const next = new Set(prev); next.has(c.key) ? next.delete(c.key) : next.add(c.key); return next; })}
+              sx={{ py: 0.5, mx: 0.5, borderRadius: 1 }}
+            >
+              <FormControlLabel
+                control={<Checkbox checked={visibleCols.has(c.key)} size="small" sx={{ py: 0 }} />}
+                label={<Typography variant="body2">{c.label}</Typography>}
+                sx={{ m: 0, width: '100%' }}
+              />
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
 
       {/* table */}
@@ -126,7 +148,7 @@ function IndentListTable({ rows }) {
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.72rem', py: 1.2, bgcolor: isDark ? 'grey.900' : 'grey.100', color: 'text.secondary', whiteSpace: 'nowrap', px: 1.5 }}>#</TableCell>
-              {LIST_COLS.map(col => (
+              {LIST_COLS.filter(col => visibleCols.has(col.key)).map(col => (
                 <TableCell key={col.key} sx={{ fontWeight: 700, fontSize: '0.72rem', py: 1.2, bgcolor: isDark ? 'grey.900' : 'grey.100', color: 'text.secondary', whiteSpace: 'nowrap', px: 1.5 }}>
                   {col.label}
                 </TableCell>
@@ -136,7 +158,7 @@ function IndentListTable({ rows }) {
           <TableBody>
             {paginated.length === 0 && (
               <TableRow>
-                <TableCell colSpan={LIST_COLS.length + 1} align="center" sx={{ py: 5, color: 'text.disabled', fontSize: '0.85rem' }}>
+                <TableCell colSpan={visibleCols.size + 1} align="center" sx={{ py: 5, color: 'text.disabled', fontSize: '0.85rem' }}>
                   No indent records yet. Submit a request to see data here.
                 </TableCell>
               </TableRow>
@@ -153,7 +175,7 @@ function IndentListTable({ rows }) {
                 <TableCell sx={{ py: 1, px: 1.5, color: 'text.disabled', fontSize: '0.75rem', fontWeight: 500 }}>
                   {page * rowsPerPage + idx + 1}
                 </TableCell>
-                {LIST_COLS.map(col => (
+                {LIST_COLS.filter(col => visibleCols.has(col.key)).map(col => (
                   <TableCell key={col.key} sx={{ py: 1, px: 1.5, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                     {col.render ? col.render(row[col.key], row) : <Typography variant="body2" fontSize="0.8rem">{String(row[col.key] ?? '—')}</Typography>}
                   </TableCell>

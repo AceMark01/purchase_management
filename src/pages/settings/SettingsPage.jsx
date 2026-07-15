@@ -1,221 +1,290 @@
-import { useState, useEffect } from 'react';
-import { useData } from '../../contexts/DataContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useState, useCallback } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import {
-  Box, Card, CardContent, CardHeader, Grid, Switch, FormControlLabel,
-  Typography, Divider, Button, Chip, Stack, Alert, Table, TableBody,
-  TableCell, TableHead, TableRow, Paper, Checkbox, FormGroup,
+  Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid,
+  TextField, MenuItem, Chip, Divider, Checkbox, FormControlLabel, IconButton, Typography
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { EditBtn, DeleteBtn } from '../../components/common/ActionButtons';
 import { toast } from 'react-toastify';
+import { useData } from '../../contexts/DataContext';
+import { gasApi } from '../../services/gasApi';
+import DataTable from '../../components/common/DataTable';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import PageHeader from '../../components/common/PageHeader';
 
-const PAGES = [
-  { key: 'dashboard', label: 'Dashboard', required: true },
-  { key: 'indent', label: 'Indent Management' },
-  { key: 'purchaseOrder', label: 'Generate PO' },
-  { key: 'followUp', label: 'Follow-Up' },
-  { key: 'logistics', label: 'Arrange Logistics' },
-  { key: 'lifting', label: 'Get Lifting' },
-  { key: 'receiveMaterial', label: 'Receive Material' },
-  { key: 'liftReceiver', label: 'Lift Receiver Material' },
-  { key: 'tallyEntry', label: 'Tally Entry' },
-  { key: 'reports', label: 'Reports' },
-  { key: 'userManagement', label: 'User Management' },
-  { key: 'settings', label: 'Settings' },
-];
-
-const ACTIONS = ['create', 'read', 'update', 'delete', 'export', 'print'];
 const ROLES = ['admin', 'user'];
 
-const defaultPermissions = {
-  admin: { pages: PAGES.map((p) => p.key), actions: Object.fromEntries(ACTIONS.map((a) => [a, true])) },
-  user: { pages: ['dashboard', 'indent', 'purchaseOrder', 'followUp', 'logistics', 'lifting', 'receiveMaterial', 'liftReceiver', 'tallyEntry'], actions: { create: true, read: true, update: true, delete: false, export: true, print: true } },
-};
+const PAGES = [
+  { key: 'dashboard',       label: 'Dashboard' },
+  { key: 'indent',          label: 'Indent Management' },
+  { key: 'purchaseOrder',   label: 'Generate Purchase PO' },
+  { key: 'approvalPO',      label: 'Approval Purchase PO' },
+  { key: 'sendPO',          label: 'Send PO To Party' },
+  { key: 'followUp',        label: 'Follow-Up' },
+  { key: 'logistics',       label: 'Arrange Logistics & Get Lifting' },
+  { key: 'receiveMaterial', label: 'Receive Material' },
+  { key: 'liftReceiver',    label: 'Lift Receiver Material' },
+  { key: 'tallyEntry',      label: 'Tally Entry' },
+  { key: 'master',          label: 'Company Master' },
+  { key: 'productData',     label: 'Product Data' },
+  { key: 'vendors',         label: 'Vendor / Supplier' },
+  { key: 'settings',        label: 'Settings' },
+];
+
+function PasswordCell({ password }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+        {show ? password : '••••••'}
+      </Typography>
+      <IconButton size="small" onClick={() => setShow(!show)}>
+        {show ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+      </IconButton>
+    </Box>
+  );
+}
+
+const COLUMNS = [
+  { key: 'name', label: 'Full Name', minWidth: 140 },
+  { key: 'email', label: 'Username', minWidth: 180 },
+  { key: 'password', label: 'Password', minWidth: 140, render: (v) => <PasswordCell password={v} /> },
+  { key: 'role', label: 'Role', minWidth: 90, render: (v) => <Chip label={v?.toUpperCase()} size="small" color={v === 'admin' ? 'primary' : 'default'} /> },
+  {
+    key: 'pageAccess',
+    label: 'Page Access',
+    minWidth: 200,
+    render: (v) => {
+      if (!v) return '-';
+      if (String(v).toUpperCase() === 'ALL') return 'ALL';
+      return String(v).split(',').map(key => {
+        const page = PAGES.find(p => p.key === key.trim());
+        return page ? page.label : key.trim();
+      }).join(', ');
+    }
+  },
+];
+
+function UserForm({ open, onClose, editItem, onSave }) {
+  const getInitialPages = () => {
+    const acc = {};
+    PAGES.forEach(p => {
+      acc[p.key] = false;
+    });
+
+    if (editItem) {
+      const pa = String(editItem.pageAccess || '').trim().toUpperCase();
+      if (pa === 'ALL') {
+        PAGES.forEach(p => {
+          acc[p.key] = true;
+        });
+      } else if (pa) {
+        pa.split(',').forEach(k => {
+          const key = k.trim();
+          if (acc[key] !== undefined) {
+            acc[key] = true;
+          }
+        });
+      }
+    }
+    return acc;
+  };
+
+  const [selectedPages, setSelectedPages] = useState(getInitialPages);
+  const [showFormPwd, setShowFormPwd] = useState(false);
+  const [pageError, setPageError] = useState('');
+
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
+    defaultValues: editItem || { name: '', email: '', password: '', role: 'user' },
+  });
+
+  const onSubmit = (data) => {
+    const selectedKeys = Object.keys(selectedPages).filter(k => selectedPages[k]);
+    if (selectedKeys.length === 0) {
+      setPageError('Required – select at least one');
+      return;
+    }
+    onSave({
+      ...data,
+      selectedPages: selectedKeys
+    });
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+      <DialogTitle>{editItem ? 'Edit User' : 'Create User'}</DialogTitle>
+      <Divider />
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <DialogContent sx={{ pt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Full Name"
+                {...register('name', { required: true })}
+                error={!!errors.name}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Username"
+                {...register('email', { required: true })}
+                error={!!errors.email}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Password"
+                type={showFormPwd ? 'text' : 'password'}
+                {...register('password', { required: true })}
+                error={!!errors.password}
+                InputProps={{
+                  endAdornment: (
+                    <IconButton size="small" onClick={() => setShowFormPwd(!showFormPwd)}>
+                      {showFormPwd ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  )
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="role"
+                control={control}
+                render={({ field: f }) => (
+                  <TextField {...f} select fullWidth size="small" label="Role">
+                    {ROLES.map((r) => <MenuItem key={r} value={r}>{r.toUpperCase()}</MenuItem>)}
+                  </TextField>
+                )}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: 'text.secondary' }}>
+                PAGE ACCESS * {pageError && <span style={{ color: 'red', fontSize: '0.75rem', marginLeft: '8px' }}>{pageError}</span>}
+              </Typography>
+              <Grid container spacing={1}>
+                {PAGES.map((page) => (
+                  <Grid item xs={12} sm={6} key={page.key}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={selectedPages[page.key] || false}
+                          onChange={(e) => {
+                            setSelectedPages(prev => {
+                              const next = { ...prev, [page.key]: e.target.checked };
+                              if (Object.values(next).some(v => v)) {
+                                setPageError('');
+                              }
+                              return next;
+                            });
+                          }}
+                          size="small"
+                        />
+                      }
+                      label={<Typography variant="body2">{page.label}</Typography>}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={onClose} variant="outlined">Cancel</Button>
+          <Button type="submit" variant="contained">{editItem ? 'Update' : 'Create'} User</Button>
+        </DialogActions>
+      </form>
+    </Dialog>
+  );
+}
 
 export default function SettingsPage() {
-  const { settings = [], updateSettingsRow, refresh } = useData();
-  const { user } = useAuth();
+  const { users: items = [], refresh, updateRow } = useData();
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
 
-  const [perms, setPerms] = useState(() => {
-    try { const s = localStorage.getItem('pms_settings_perms'); return s ? JSON.parse(s) : defaultPermissions; }
-    catch { return defaultPermissions; }
-  });
-  const [activeRole, setActiveRole] = useState('admin');
-
-  // Sync settings loaded from Google Sheets
-  useEffect(() => {
-    if (settings && settings.length > 0) {
-      const sheetPerms = {};
-      settings.forEach((s) => {
-        if (s.role === 'admin' || s.role === 'user') {
-          sheetPerms[s.role] = {
-            pages: s.pages,
-            actions: s.actions
-          };
-        }
-      });
-      setPerms({
-        admin: sheetPerms.admin || perms.admin || defaultPermissions.admin,
-        user: sheetPerms.user || perms.user || defaultPermissions.user,
-      });
-    }
-  }, [settings]);
-
-  const togglePage = (page) => {
-    if (page === 'dashboard') return;
-    setPerms((prev) => {
-      const pages = prev[activeRole].pages.includes(page)
-        ? prev[activeRole].pages.filter((p) => p !== page)
-        : [...prev[activeRole].pages, page];
-      return { ...prev, [activeRole]: { ...prev[activeRole], pages } };
-    });
-  };
-
-  const toggleAction = (action) => {
-    setPerms((prev) => ({
-      ...prev,
-      [activeRole]: { ...prev[activeRole], actions: { ...prev[activeRole].actions, [action]: !prev[activeRole].actions[action] } },
-    }));
-  };
-
-  const save = async () => {
+  const handleSave = async (data) => {
+    const isEdit = !!selected;
     try {
-      for (const role of ROLES) {
-        const sheetRow = settings.find(r => r.role === role);
-        const rowIndex = sheetRow ? sheetRow._row : null;
-        await updateSettingsRow(rowIndex, { role, ...perms[role] }, user?.name || 'Admin');
+      let result;
+      const isAllSelected = data.selectedPages.length === PAGES.length;
+      const pageAccessStr = isAllSelected ? 'ALL' : data.selectedPages.join(',');
+
+      const payload = {
+        "FULLNAME": data.name,
+        "USERNAME": data.email,
+        "PASSWORD": data.password,
+        "ROLE": String(data.role || "user").toUpperCase(),
+        "PAGE-ACCESS": pageAccessStr,
+      };
+
+      if (isEdit) {
+        await updateRow('users', selected._row, payload);
+        result = { success: true };
+      } else {
+        const rowValues = [
+          payload["FULLNAME"],
+          payload["USERNAME"],
+          payload["PASSWORD"],
+          payload["ROLE"],
+          payload["PAGE-ACCESS"]
+        ];
+        result = await gasApi.insertInColumns("LOGIN", 1, rowValues, 1);
       }
-      localStorage.setItem('pms_settings_perms', JSON.stringify(perms));
-      // Sync local storage session permissions if active user's role is updated
-      if (user && perms[user.role]) {
-        localStorage.setItem('pms_permissions', JSON.stringify(perms[user.role]));
+
+      if (result.success) {
+        toast.success(isEdit ? 'User updated!' : 'User created!');
+        await refresh();
       }
-      await refresh();
-      toast.success('Permissions saved to Google Sheet successfully!');
     } catch (err) {
       console.error(err);
-      toast.error(err.message || 'Failed to save settings.');
+      toast.error(err.message || "Failed to save user.");
     }
   };
 
-  const reset = () => { setPerms(defaultPermissions); toast.info('Permissions reset to defaults! Click Save Settings to persist.'); };
+  const handleDelete = async () => {
+    try {
+      const result = await gasApi.deleteRow("LOGIN", selected._row);
+      if (result.success) {
+        toast.success('User deleted!');
+        await refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete user.");
+    } finally {
+      setDeleteOpen(false);
+      setSelected(null);
+    }
+  };
+
+  const actions = useCallback((row) => [
+    <EditBtn key="edit" onClick={() => { setSelected(row); setFormOpen(true); }} />,
+    <DeleteBtn key="delete" onClick={() => { setSelected(row); setDeleteOpen(true); }} />,
+  ], []);
 
   return (
     <Box>
-      <PageHeader title="Settings" subtitle="Manage role-based access permissions"
+      <PageHeader title="Settings" subtitle={`${items.length} users`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]}
-        actions={
-          <Stack direction="row" spacing={1}>
-            <Button variant="outlined" onClick={reset}>Reset Defaults</Button>
-            <Button variant="contained" onClick={save}>Save Settings</Button>
-          </Stack>
-        }
+        actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelected(null); setFormOpen(true); }}>Create User</Button>}
       />
-
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Configure page access and action permissions for each role. Changes will apply to new sessions.
-      </Alert>
-
-      <Grid container spacing={3}>
-        <Grid item="true" xs={12} md={8}>
-          <Card>
-            <CardHeader
-              title="Page Access Permissions"
-              subheader="Control which pages each role can access"
-              action={
-                <Stack direction="row" spacing={1}>
-                  {ROLES.map((r) => (
-                    <Chip key={r} label={r.toUpperCase()} clickable color={activeRole === r ? 'primary' : 'default'}
-                      onClick={() => setActiveRole(r)} />
-                  ))}
-                </Stack>
-              }
-            />
-            <Divider />
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Role: <strong>{activeRole.toUpperCase()}</strong>
-              </Typography>
-              <Paper variant="outlined" sx={{ borderRadius: 1 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Page</TableCell>
-                      <TableCell align="center">Access</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {PAGES.map((page) => (
-                      <TableRow key={page.key} hover>
-                        <TableCell>
-                          <Typography variant="body2">{page.label}</Typography>
-                          {page.required && <Chip label="Required" size="small" sx={{ ml: 1, height: 16, fontSize: '0.65rem' }} />}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Switch
-                            checked={perms[activeRole]?.pages?.includes(page.key) ?? false}
-                            onChange={() => togglePage(page.key)}
-                            disabled={page.required}
-                            size="small"
-                            color="success"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Paper>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item="true" xs={12} md={4}>
-          <Card>
-            <CardHeader title="Action Permissions" subheader={`For role: ${activeRole.toUpperCase()}`} />
-            <Divider />
-            <CardContent>
-              <FormGroup>
-                {ACTIONS.map((action) => (
-                  <FormControlLabel
-                    key={action}
-                    control={
-                      <Checkbox
-                        checked={perms[activeRole]?.actions?.[action] ?? false}
-                        onChange={() => toggleAction(action)}
-                        color="primary"
-                      />
-                    }
-                    label={<Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{action}</Typography>}
-                  />
-                ))}
-              </FormGroup>
-            </CardContent>
-          </Card>
-
-          <Card sx={{ mt: 2 }}>
-            <CardHeader title="Permission Summary" />
-            <Divider />
-            <CardContent>
-              {ROLES.map((role) => (
-                <Box key={role} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom color={role === 'admin' ? 'primary' : 'text.primary'}>
-                    {role.toUpperCase()}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Pages: {perms[role]?.pages?.length || 0} / {PAGES.length}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                    {ACTIONS.map((a) => (
-                      <Chip key={a} label={a} size="small" color={perms[role]?.actions?.[a] ? 'success' : 'default'}
-                        variant={perms[role]?.actions?.[a] ? 'filled' : 'outlined'} sx={{ height: 18, fontSize: '0.65rem' }} />
-                    ))}
-                  </Box>
-                </Box>
-              ))}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <DataTable columns={COLUMNS} rows={items} title="Users" searchKey={['name', 'email']} actions={actions} />
+      {formOpen && (
+        <UserForm open={formOpen} onClose={() => { setFormOpen(false); setSelected(null); }} editItem={selected} onSave={handleSave} />
+      )}
+      <ConfirmDialog open={deleteOpen} onConfirm={handleDelete} onCancel={() => setDeleteOpen(false)} message={`Delete user "${selected?.name}"?`} />
     </Box>
   );
 }

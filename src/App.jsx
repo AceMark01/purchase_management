@@ -8,7 +8,6 @@ import LoginPage from './pages/auth/LoginPage';
 import UnauthorizedPage from './pages/auth/UnauthorizedPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import IndentManagementPage from './pages/indent/IndentManagementPage';
-import WhatsAppFormPage from './pages/whatsapp/WhatsAppFormPage';
 import PurchaseOrderPage from './pages/purchaseOrder/PurchaseOrderPage';
 import ApprovalPurchasePOPage from './pages/purchaseOrder/ApprovalPurchasePOPage';
 import SendPOToPartyPage from './pages/purchaseOrder/SendPOToPartyPage';
@@ -18,7 +17,6 @@ import ArrangeLogisticsPage from './pages/logistics/ArrangeLogisticsPage';
 import ReceiveMaterialPage from './pages/receiveMaterial/ReceiveMaterialPage';
 import LiftReceiverPage from './pages/liftReceiver/LiftReceiverPage';
 import TallyEntryPage from './pages/tallyEntry/TallyEntryPage';
-import UserManagementPage from './pages/userManagement/UserManagementPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import CompanyMasterPage from './pages/master/CompanyMasterPage';
@@ -35,11 +33,10 @@ export default function App() {
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<ProtectedRoute page="dashboard"><DashboardPage /></ProtectedRoute>} />
-          <Route path="/whatsapp-form" element={<ProtectedRoute page="whatsapp"><WhatsAppFormPage /></ProtectedRoute>} />
           <Route path="/indent" element={<ProtectedRoute page="indent"><IndentManagementPage /></ProtectedRoute>} />
           <Route path="/purchase-order" element={<ProtectedRoute page="purchaseOrder"><PurchaseOrderPage /></ProtectedRoute>} />
-          <Route path="/approval-po" element={<ProtectedRoute page="purchaseOrder"><ApprovalPurchasePOPage /></ProtectedRoute>} />
-          <Route path="/send-po" element={<ProtectedRoute page="purchaseOrder"><SendPOToPartyPage /></ProtectedRoute>} />
+          <Route path="/approval-po" element={<ProtectedRoute page="approvalPO"><ApprovalPurchasePOPage /></ProtectedRoute>} />
+          <Route path="/send-po" element={<ProtectedRoute page="sendPO"><SendPOToPartyPage /></ProtectedRoute>} />
           <Route path="/follow-up" element={<ProtectedRoute page="followUp"><FollowUpPage /></ProtectedRoute>} />
           <Route path="/logistics" element={<ProtectedRoute page="logistics"><ArrangeLogisticsPage /></ProtectedRoute>} />
           <Route path="/lifting"   element={<Navigate to="/logistics" replace />} />
@@ -47,11 +44,10 @@ export default function App() {
           <Route path="/receive-material" element={<ProtectedRoute page="receiveMaterial"><ReceiveMaterialPage /></ProtectedRoute>} />
           <Route path="/lift-receiver" element={<ProtectedRoute page="liftReceiver"><LiftReceiverPage /></ProtectedRoute>} />
           <Route path="/tally-entry" element={<ProtectedRoute page="tallyEntry"><TallyEntryPage /></ProtectedRoute>} />
-          <Route path="/users"            element={<ProtectedRoute page="userManagement"><UserManagementPage /></ProtectedRoute>} />
           <Route path="/settings"         element={<ProtectedRoute page="settings"><SettingsPage /></ProtectedRoute>} />
           <Route path="/reports"          element={<ProtectedRoute page="reports"><ReportsPage /></ProtectedRoute>} />
           <Route path="/master"           element={<ProtectedRoute page="master"><CompanyMasterPage /></ProtectedRoute>} />
-          <Route path="/product-data"     element={<ProtectedRoute page="master"><ProductMasterPage /></ProtectedRoute>} />
+          <Route path="/product-data"     element={<ProtectedRoute page="productData"><ProductMasterPage /></ProtectedRoute>} />
           <Route path="/vendors"          element={<ProtectedRoute page="vendors"><VendorMasterPage /></ProtectedRoute>} />
         </Route>
 

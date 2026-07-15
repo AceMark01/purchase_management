@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Box, Card, CardContent, TextField, Button, Typography, Alert,
-  InputAdornment, IconButton, Divider, alpha, useTheme,
+  InputAdornment, IconButton,
 } from '@mui/material';
 import EmailIcon              from '@mui/icons-material/Email';
 import LockIcon               from '@mui/icons-material/Lock';
@@ -17,7 +17,6 @@ import { useAuth }            from '../../contexts/AuthContext';
 export default function LoginPage() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
-  const theme    = useTheme();
   const [showPwd, setShowPwd] = useState(false);
   const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -167,29 +166,6 @@ export default function LoginPage() {
               </Button>
             </Box>
           </form>
-
-
-          {/* ── Demo credentials ── */}
-          <Box
-            sx={{
-              mt: 2.5, p: 1.75, borderRadius: 2,
-              bgcolor: alpha(theme.palette.info.main, 0.06),
-              border: 1, borderColor: alpha(theme.palette.info.main, 0.18),
-            }}
-          >
-            <Typography variant="caption" fontWeight={700} color="info.main" display="block" mb={0.75} letterSpacing="0.04em" textTransform="uppercase">
-              Demo Credentials
-            </Typography>
-            {[
-              ['Admin', 'admin / admin123'],
-              ['User',  'user / user123'],
-            ].map(([role, cred]) => (
-              <Box key={role} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
-                <Typography variant="caption" color="text.secondary">{role}:</Typography>
-                <Typography variant="caption" fontFamily="monospace" color="text.primary">{cred}</Typography>
-              </Box>
-            ))}
-          </Box>
 
         </CardContent>
       </Card>

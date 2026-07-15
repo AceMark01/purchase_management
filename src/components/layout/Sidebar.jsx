@@ -13,7 +13,6 @@ import ForkliftIcon         from '@mui/icons-material/Forklift';
 import InventoryIcon        from '@mui/icons-material/Inventory';
 import MoveToInboxIcon      from '@mui/icons-material/MoveToInbox';
 import CalculateIcon        from '@mui/icons-material/Calculate';
-import PeopleIcon           from '@mui/icons-material/People';
 import SettingsIcon         from '@mui/icons-material/Settings';
 import AssessmentIcon       from '@mui/icons-material/Assessment';
 import ExpandLessIcon       from '@mui/icons-material/ExpandLess';
@@ -25,7 +24,6 @@ import HandshakeIcon        from '@mui/icons-material/Handshake';
 import FactCheckIcon        from '@mui/icons-material/FactCheck';
 import SendIcon             from '@mui/icons-material/Send';
 import VerifiedIcon         from '@mui/icons-material/Verified';
-import WhatsAppIcon         from '@mui/icons-material/WhatsApp';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const DRAWER_WIDTH = 264;
@@ -41,11 +39,10 @@ const NAV_SECTIONS = [
     key: 'purchase',
     label: 'Purchase Process',
     items: [
-      { label: 'WhatsApp Form',                  icon: WhatsAppIcon,      path: '/whatsapp-form',    page: 'whatsapp' },
       { label: 'Indent Management',              icon: DescriptionIcon,   path: '/indent',           page: 'indent' },
       { label: 'Generate Purchase PO',           icon: ShoppingCartIcon,  path: '/purchase-order',   page: 'purchaseOrder' },
-      { label: 'Approval Purchase PO',           icon: FactCheckIcon,     path: '/approval-po',      page: 'purchaseOrder' },
-      { label: 'Send PO To Party',               icon: SendIcon,          path: '/send-po',          page: 'purchaseOrder' },
+      { label: 'Approval Purchase PO',           icon: FactCheckIcon,     path: '/approval-po',      page: 'approvalPO' },
+      { label: 'Send PO To Party',               icon: SendIcon,          path: '/send-po',          page: 'sendPO' },
       { label: 'Follow-Up',                      icon: PhoneCallbackIcon, path: '/follow-up',        page: 'followUp' },
       { label: 'Arrange Logistics & Get Lifting',icon: LocalShippingIcon, path: '/logistics',        page: 'logistics' },
       { label: 'Receive Material',               icon: InventoryIcon,     path: '/receive-material', page: 'receiveMaterial' },
@@ -58,7 +55,7 @@ const NAV_SECTIONS = [
     label: 'Masters',
     items: [
       { label: 'Company Master',         icon: ApartmentIcon,  path: '/master',   page: 'master' },
-      { label: 'Product Data',           icon: BusinessCenterIcon, path: '/product-data', page: 'master' },
+      { label: 'Product Data',           icon: BusinessCenterIcon, path: '/product-data', page: 'productData' },
       { label: 'Vendor / Supplier',      icon: HandshakeIcon,  path: '/vendors',  page: 'vendors' },
     ],
   },
@@ -66,7 +63,6 @@ const NAV_SECTIONS = [
     key: 'admin',
     label: 'Administration',
     items: [
-      { label: 'User Management', icon: PeopleIcon,   path: '/users',    page: 'userManagement' },
       { label: 'Settings',        icon: SettingsIcon, path: '/settings', page: 'settings' },
     ],
   },

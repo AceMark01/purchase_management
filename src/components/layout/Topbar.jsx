@@ -10,7 +10,6 @@ import NotificationsIcon  from '@mui/icons-material/Notifications';
 import LightModeIcon      from '@mui/icons-material/LightMode';
 import DarkModeIcon       from '@mui/icons-material/DarkMode';
 import LogoutIcon         from '@mui/icons-material/Logout';
-import SettingsIcon       from '@mui/icons-material/Settings';
 import DoneAllIcon        from '@mui/icons-material/DoneAll';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { useSelector, useDispatch } from 'react-redux';
@@ -31,8 +30,7 @@ const PAGE_TITLES = {
   '/receive-material': { label: 'Receive Material',       sub: 'Record material receipts' },
   '/lift-receiver':    { label: 'Lift Receiver Material', sub: 'Manage received material storage' },
   '/tally-entry':      { label: 'Tally Entry',            sub: 'Financial voucher entries' },
-  '/users':            { label: 'User Management',        sub: 'Manage system users & roles' },
-  '/settings':         { label: 'Settings',               sub: 'Configure permissions' },
+  '/settings':         { label: 'Settings',               sub: 'Manage system users & roles' },
   '/reports':          { label: 'Reports & Analytics',    sub: 'Business intelligence' },
 };
 
@@ -343,15 +341,6 @@ export default function Topbar({ onMenuClick, sidebarOpen }) {
 
         <Divider />
 
-        {isAdmin && (
-          <MenuItem
-            onClick={() => { setProfileAnchor(null); navigate('/settings'); }}
-            sx={{ mx: 0.5, my: 0.25, borderRadius: 1.5 }}
-          >
-            <ListItemIcon><SettingsIcon sx={{ fontSize: 18 }} /></ListItemIcon>
-            <Typography variant="body2">Settings</Typography>
-          </MenuItem>
-        )}
 
         <Box sx={{ px: 0.5, py: 0.5 }}>
           <MenuItem
