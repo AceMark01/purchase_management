@@ -28,6 +28,7 @@ const COLUMNS = [
 
 function ProductForm({ open, onClose, editItem, onSave }) {
   const { vendors = [], productTypes = [], units = [] } = useData();
+  const [submitting, setSubmitting] = useState(false);
 
   const { register, control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
     defaultValues: {
@@ -59,16 +60,24 @@ function ProductForm({ open, onClose, editItem, onSave }) {
     }
   }, [editItem, open, reset]);
 
-  const onSubmit = data => {
-    onSave({ ...data, id: editItem?.id || Date.now(), purchaseRate: parseFloat(data.purchaseRate) || 0 });
-    onClose();
-    reset();
+  const onSubmit = async data => {
+    setSubmitting(true);
+    try {
+      await onSave({ ...data, id: editItem?.id || Date.now(), purchaseRate: parseFloat(data.purchaseRate) || 0 });
+      reset();
+      onClose();
+    } catch (err) {
+      // Handled in parent
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const INPUT_SX = { '& .MuiInputBase-root': { fontSize: '0.875rem' } };
   const field = (name, label, opts = {}) => (
     <TextField
       fullWidth size="small" label={label} sx={INPUT_SX}
+      disabled={submitting}
       {...register(name, { required: opts.required !== false ? `${label} is required` : false })}
       error={!!errors[name]} helperText={errors[name]?.message}
       type={opts.type || 'text'}
@@ -76,7 +85,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
   );
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+    <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
       <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>{editItem ? 'Edit Product' : 'Add New Product'}</DialogTitle>
       <Divider />
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -84,7 +93,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Controller name="productType" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Product Type" error={!!errors.productType} helperText={errors.productType?.message} sx={INPUT_SX}>
+                <TextField {...f} select fullWidth size="small" label="Product Type" error={!!errors.productType} helperText={errors.productType?.message} sx={INPUT_SX} disabled={submitting}>
                   {productTypes.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
                   {f.value && !productTypes.includes(f.value) && (
                     <MenuItem value={f.value}>{f.value}</MenuItem>
@@ -94,7 +103,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
             </Grid>
             <Grid item xs={12} sm={6}>
               <Controller name="vendorName" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Vendor Name" error={!!errors.vendorName} helperText={errors.vendorName?.message} sx={INPUT_SX}>
+                <TextField {...f} select fullWidth size="small" label="Vendor Name" error={!!errors.vendorName} helperText={errors.vendorName?.message} sx={INPUT_SX} disabled={submitting}>
                   {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                 </TextField>
               )} />
@@ -105,6 +114,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
                 InputProps={{ readOnly: true }}
                 InputLabelProps={{ shrink: true }}
                 sx={INPUT_SX}
+                disabled={submitting}
                 {...register('vendorId')}
               />
             </Grid>
@@ -112,7 +122,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
             <Grid item xs={12} sm={6}>{field('itemName', 'Item Name')}</Grid>
             <Grid item xs={12} sm={6}>
               <Controller name="unit" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Unit" error={!!errors.unit} helperText={errors.unit?.message} sx={INPUT_SX}>
+                <TextField {...f} select fullWidth size="small" label="Unit" error={!!errors.unit} helperText={errors.unit?.message} sx={INPUT_SX} disabled={submitting}>
                   {units.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
                   {f.value && !units.includes(f.value) && (
                     <MenuItem value={f.value}>{f.value}</MenuItem>
@@ -126,8 +136,10 @@ function ProductForm({ open, onClose, editItem, onSave }) {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={onClose} variant="outlined">Cancel</Button>
-          <Button type="submit" variant="contained">{editItem ? 'Update' : 'Add'} Product</Button>
+          <Button onClick={onClose} variant="outlined" disabled={submitting}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={submitting}>
+            {submitting ? 'Saving...' : (editItem ? 'Update' : 'Add') + ' Product'}
+          </Button>
         </DialogActions>
       </form>
     </Dialog>
@@ -156,7 +168,7 @@ export default function ProductMasterPage() {
         "Purchase Rate": Number(item.purchaseRate) || 0,
       };
       if (isEdit) {
-        await updateRow('products', existing._row, payload);
+        await updateRow('products', existing._row, payload, false);
         result = { success: true };
       } else {
         const rowValues = [
@@ -173,11 +185,14 @@ export default function ProductMasterPage() {
       }
       if (result.success) {
         toast.success(isEdit ? 'Product updated!' : 'Product added!');
-        await refresh();
+        await refresh(['productsData'], false);
+      } else {
+        throw new Error(result.error || "Save failed");
       }
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to save product.");
+      throw err; // propagates to onSubmit finally to stop dismiss on error
     }
   };
 
@@ -187,7 +202,7 @@ export default function ProductMasterPage() {
       const result = await gasApi.deleteRow("Master-Products", row._row);
       if (result.success) {
         toast.success('Product deleted.');
-        await refresh();
+        await refresh(['productsData'], false);
       }
     } catch (err) {
       console.error(err);

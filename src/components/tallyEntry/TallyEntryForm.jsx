@@ -101,11 +101,11 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
             "PO Attach": poUrl || "",
             "Bilty Attach": biltyUrl || "",
             "Invoice Attach": invoiceUrl || "",
-          });
+          }, false);
         }
       }
       toast.success(`Tally Entry finalised! ${matchedRecords.length} item(s) — workflow complete.`);
-      await refresh();
+      await refresh(['indents'], false);
       onClose();
     } catch (err) {
       console.error("Failed to finalise tally entry:", err);

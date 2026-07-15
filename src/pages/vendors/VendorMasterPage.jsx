@@ -37,6 +37,7 @@ function getComparator(order, orderBy) {
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
 function VendorForm({ open, onClose, editItem, onSave }) {
+  const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
       vendorName: '', contactPerson: '', phoneNumber: '', email: '',
@@ -44,16 +45,24 @@ function VendorForm({ open, onClose, editItem, onSave }) {
     },
   });
 
-  const onSubmit = (data) => {
-    onSave(data);
-    reset();
-    onClose();
+  const onSubmit = async (data) => {
+    setSubmitting(true);
+    try {
+      await onSave(data);
+      reset();
+      onClose();
+    } catch (err) {
+      // Handled in parent
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const F = ({ name, label, required = true, type = 'text', sm = 6 }) => (
     <Grid item xs={12} sm={sm}>
       <TextField
         fullWidth size="small" label={label} type={type}
+        disabled={submitting}
         {...register(name, {
           required: required ? `${label} is required` : false,
           ...(name === 'email' ? { pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email' } } : {}),
@@ -65,7 +74,7 @@ function VendorForm({ open, onClose, editItem, onSave }) {
   );
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+    <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
       <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>
         {editItem ? 'Edit Vendor' : 'Create New Vendor'}
       </DialogTitle>
@@ -86,9 +95,9 @@ function VendorForm({ open, onClose, editItem, onSave }) {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" color="inherit">Cancel</Button>
-          <Button type="submit" variant="contained">
-            {editItem ? 'Update Vendor' : 'Create Vendor'}
+          <Button onClick={onClose} variant="outlined" color="inherit" disabled={submitting}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={submitting}>
+            {submitting ? 'Saving...' : (editItem ? 'Update Vendor' : 'Create Vendor')}
           </Button>
         </DialogActions>
       </form>
@@ -162,7 +171,7 @@ export default function VendorMasterPage() {
           "GST Number": data.gstNumber,
           "Vendor Location": data.vendorLocation,
         };
-        await updateRow('vendors', selected._row, payload);
+        await updateRow('vendors', selected._row, payload, false);
         result = { success: true };
       } else {
         let nextId = "VI-001";
@@ -190,11 +199,14 @@ export default function VendorMasterPage() {
 
       if (result.success) {
         toast.success(isEdit ? 'Vendor updated!' : 'Vendor created!');
-        await refresh();
+        await refresh(['vendorsData'], false);
+      } else {
+        throw new Error(result.error || "Save failed");
       }
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to save vendor.");
+      throw err; // propagates to onSubmit finally to stop dismiss on error
     }
   };
 
@@ -203,7 +215,7 @@ export default function VendorMasterPage() {
       const result = await gasApi.deleteRow("Master-Vendors", selected._row);
       if (result.success) {
         toast.success('Vendor deleted successfully!');
-        await refresh();
+        await refresh(['vendorsData'], false);
       }
     } catch (err) {
       console.error(err);

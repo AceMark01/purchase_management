@@ -102,10 +102,10 @@ export default function WhatsAppFormPage() {
         "Email Address": data.email || ''
       };
 
-      const result = await addRow('whatsapp', payload);
+      const result = await addRow('whatsapp', payload, false);
       if (result.success) {
         toast.success('WhatsApp order entry saved!');
-        await refresh();
+        await refresh(['whatsapp'], false);
         reset({
           timestamp: formatTimestamp().slice(0, 16),
           partyName: '', orderBy: '', email: '',
@@ -129,7 +129,7 @@ export default function WhatsAppFormPage() {
       const result = await gasApi.removeResource('whatsapp', target.timestamp);
       if (result.success) {
         toast.info('Entry removed');
-        await refresh();
+        await refresh(['whatsapp'], false);
       }
     } catch (err) {
       console.error("Failed to delete entry:", err);

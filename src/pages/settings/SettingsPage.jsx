@@ -69,6 +69,7 @@ const COLUMNS = [
 ];
 
 function UserForm({ open, onClose, editItem, onSave }) {
+  const [submitting, setSubmitting] = useState(false);
   const getInitialPages = useCallback(() => {
     const acc = {};
     PAGES.forEach(p => {
@@ -109,17 +110,25 @@ function UserForm({ open, onClose, editItem, onSave }) {
     }
   }, [editItem, open, getInitialPages, reset]);
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     const selectedKeys = Object.keys(selectedPages).filter(k => selectedPages[k]);
     if (selectedKeys.length === 0) {
       setPageError('Required – select at least one');
       return;
     }
-    onSave({
-      ...data,
-      selectedPages: selectedKeys
-    });
-    onClose();
+    setSubmitting(true);
+    try {
+      await onSave({
+        ...data,
+        selectedPages: selectedKeys
+      });
+      reset();
+      onClose();
+    } catch (err) {
+      // Handled in parent
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const allChecked = PAGES.every(p => selectedPages[p.key]);
@@ -136,7 +145,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+    <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
       <DialogTitle>{editItem ? 'Edit User' : 'Create User'}</DialogTitle>
       <Divider />
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -147,6 +156,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
                 fullWidth
                 size="small"
                 label="Full Name"
+                disabled={submitting}
                 {...register('name', { required: true })}
                 error={!!errors.name}
               />
@@ -156,6 +166,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
                 fullWidth
                 size="small"
                 label="Username"
+                disabled={submitting}
                 {...register('email', { required: true })}
                 error={!!errors.email}
               />
@@ -166,11 +177,12 @@ function UserForm({ open, onClose, editItem, onSave }) {
                 size="small"
                 label="Password"
                 type={showFormPwd ? 'text' : 'password'}
+                disabled={submitting}
                 {...register('password', { required: true })}
                 error={!!errors.password}
                 InputProps={{
                   endAdornment: (
-                    <IconButton size="small" onClick={() => setShowFormPwd(!showFormPwd)}>
+                    <IconButton size="small" onClick={() => setShowFormPwd(!showFormPwd)} disabled={submitting}>
                       {showFormPwd ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                     </IconButton>
                   )
@@ -182,7 +194,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
                 name="role"
                 control={control}
                 render={({ field: f }) => (
-                  <TextField {...f} select fullWidth size="small" label="Role">
+                  <TextField {...f} select fullWidth size="small" label="Role" disabled={submitting}>
                     {ROLES.map((r) => <MenuItem key={r} value={r}>{r.toUpperCase()}</MenuItem>)}
                   </TextField>
                 )}
@@ -201,6 +213,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
                         indeterminate={!allChecked && PAGES.some(p => selectedPages[p.key])}
                         onChange={handleAllChange}
                         size="small"
+                        disabled={submitting}
                       />
                     }
                     label={<Typography variant="body2" sx={{ fontWeight: 'bold' }}>ALL</Typography>}
@@ -212,6 +225,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
                       control={
                         <Checkbox
                           checked={selectedPages[page.key] || false}
+                          disabled={submitting}
                           onChange={(e) => {
                             setSelectedPages(prev => {
                               const next = { ...prev, [page.key]: e.target.checked };
@@ -234,8 +248,10 @@ function UserForm({ open, onClose, editItem, onSave }) {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={onClose} variant="outlined">Cancel</Button>
-          <Button type="submit" variant="contained">{editItem ? 'Update' : 'Create'} User</Button>
+          <Button onClick={onClose} variant="outlined" disabled={submitting}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={submitting}>
+            {submitting ? 'Saving...' : (editItem ? 'Update' : 'Create') + ' User'}
+          </Button>
         </DialogActions>
       </form>
     </Dialog>
@@ -264,7 +280,7 @@ export default function SettingsPage() {
       };
 
       if (isEdit) {
-        await updateRow('users', selected._row, payload);
+        await updateRow('users', selected._row, payload, false);
         result = { success: true };
       } else {
         const rowValues = [
@@ -279,11 +295,14 @@ export default function SettingsPage() {
 
       if (result.success) {
         toast.success(isEdit ? 'User updated!' : 'User created!');
-        await refresh();
+        await refresh(['users'], false);
+      } else {
+        throw new Error(result.error || "Save failed");
       }
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to save user.");
+      throw err; // propagates to onSubmit finally to stop dismiss on error
     }
   };
 
@@ -292,7 +311,7 @@ export default function SettingsPage() {
       const result = await gasApi.deleteRow("LOGIN", selected._row);
       if (result.success) {
         toast.success('User deleted!');
-        await refresh();
+        await refresh(['users'], false);
       }
     } catch (err) {
       console.error(err);

@@ -233,7 +233,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
         toast.success('Follow-up status recorded successfully!');
       }
 
-      await refresh();
+      await refresh(['indents', 'followUps'], false);
       onClose();
     } catch (err) {
       console.error("Failed to save follow-up:", err);

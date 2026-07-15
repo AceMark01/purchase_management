@@ -39,6 +39,7 @@ function getComparator(order, orderBy) {
 
 /* ── Create / Edit Dialog ──────────────────────────────────── */
 function CompanyForm({ open, onClose, editItem, onSave }) {
+  const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: editItem || {
       companyName: '', email: '', phoneNumber: '', gstNumber: '',
@@ -46,16 +47,24 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
     },
   });
 
-  const onSubmit = (data) => {
-    onSave(data);
-    reset();
-    onClose();
+  const onSubmit = async (data) => {
+    setSubmitting(true);
+    try {
+      await onSave(data);
+      reset();
+      onClose();
+    } catch (err) {
+      // Handled in parent
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const F = ({ name, label, required = true, type = 'text', sm = 6 }) => (
     <Grid item xs={12} sm={sm}>
       <TextField
         fullWidth size="small" label={label} type={type}
+        disabled={submitting}
         {...register(name, {
           required: required ? `${label} is required` : false,
           ...(name === 'email' ? { pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email' } } : {}),
@@ -69,7 +78,7 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
   );
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+    <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
       <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>
         {editItem ? 'Edit Company' : 'Create New Company'}
       </DialogTitle>
@@ -92,9 +101,9 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" color="inherit">Cancel</Button>
-          <Button type="submit" variant="contained">
-            {editItem ? 'Update Company' : 'Create Company'}
+          <Button onClick={onClose} variant="outlined" color="inherit" disabled={submitting}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={submitting}>
+            {submitting ? 'Saving...' : (editItem ? 'Update Company' : 'Create Company')}
           </Button>
         </DialogActions>
       </form>
@@ -168,7 +177,7 @@ export default function CompanyMasterPage() {
       };
 
       if (isEdit) {
-        await updateRow('companies', selected._row, payload);
+        await updateRow('companies', selected._row, payload, false);
         result = { success: true };
       } else {
         const rowValues = [
@@ -185,11 +194,14 @@ export default function CompanyMasterPage() {
 
       if (result.success) {
         toast.success(isEdit ? 'Company updated!' : 'Company created!');
-        await refresh();
+        await refresh(['companiesData'], false);
+      } else {
+        throw new Error(result.error || "Save failed");
       }
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to save company.");
+      throw err; // propagates to onSubmit finally to stop dismiss on error
     }
   };
 
@@ -198,7 +210,7 @@ export default function CompanyMasterPage() {
       const result = await gasApi.deleteRow("Master-Company", selected._row);
       if (result.success) {
         toast.success('Company deleted successfully!');
-        await refresh();
+        await refresh(['companiesData'], false);
       }
     } catch (err) {
       console.error(err);

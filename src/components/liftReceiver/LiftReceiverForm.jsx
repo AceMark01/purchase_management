@@ -107,7 +107,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
             "lift Status": "Completed",
             "Lifted Image": receiverImageUrl || (receiverFile ? receiverFile.name : ''),
             "Remarks": data.remarks || ""
-          });
+          }, false);
           updatedCount++;
         }
       }
@@ -119,7 +119,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
       }
 
       toast.success(`Lift Receiver verified for ${updatedCount} item(s)!`);
-      await refresh();
+      await refresh(['indents', 'receiving'], false);
       onClose();
     } catch (err) {
       console.error("Failed to verify lift:", err);

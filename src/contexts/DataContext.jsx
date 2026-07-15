@@ -642,7 +642,7 @@ export function DataProvider({ children }) {
     }
   };
 
-  const addRow = async (resource, data) => {
+  const addRow = async (resource, data, showSpinner = true) => {
     const sheetName = SHEET_MAP[resource];
     const headers = headersState[resource] || [];
     const rowValues = [];
@@ -657,12 +657,12 @@ export function DataProvider({ children }) {
         rowValues.push("");
       }
     }
-    setWriteLoading(true);
+    if (showSpinner) setWriteLoading(true);
     try {
       const res = await gasApi.insertRow(sheetName, rowValues);
       return res;
     } finally {
-      setWriteLoading(false);
+      if (showSpinner) setWriteLoading(false);
     }
   };
 

@@ -346,7 +346,7 @@ export default function IndentManagementPage() {
         const indentNumber = result.indentNumber || "";
 
         toast.success(`Indent ${indentNumber} submitted with ${activeItems.length} item(s)!`);
-        await refresh(['indents']);
+        await refresh(['indents'], false);
         reset({ companyName: data.companyName, orderBy: '', partyName: '', filterGroup: '', searchItem: '', items: [] });
         setImageFile(null);
         if (imageRef.current) imageRef.current.value = '';

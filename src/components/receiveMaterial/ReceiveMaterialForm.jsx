@@ -262,7 +262,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       }
 
       toast.success(`Material received! ${matchedRecords.length} item(s) moved to Lift Receiver.`);
-      await refresh();
+      await refresh(['indents', 'receiving', 'logistics'], false);
       onClose();
     } catch (err) {
       console.error("Failed to receive material:", err);
