@@ -203,7 +203,7 @@ export default function IndentManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { products, vendors, companies, orderByList, refresh } = useData();
+  const { products, vendors, companies, orderByList, refresh, startSync, endSync } = useData();
 
   const {
     register: reg,
@@ -289,6 +289,7 @@ export default function IndentManagementPage() {
     }
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     let imageUrl = '';
     const folderId = import.meta.env.VITE_GOOGLE_FOLDER_INDENT;
 
@@ -357,6 +358,7 @@ export default function IndentManagementPage() {
       toast.error(err.message || "Failed to submit indent request.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 

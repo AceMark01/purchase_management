@@ -56,7 +56,7 @@ const getHistoryCols = (onViewPO) => [
     ) : '—',
   },
 ];export default function ApprovalPurchasePOPage() {
-  const { refresh, updateRow } = useData();
+  const { refresh, updateRow, startSync, endSync } = useData();
   const records = useSelector((s) => s.workflow.records);
 
   const [tabValue,       setTabValue]       = useState(0);
@@ -107,7 +107,7 @@ const getHistoryCols = (onViewPO) => [
     setConfirmOpen(false);
     setSelectedRow(null);
 
-    toast.info(`Submitting decision for PO ${poNumber}...`);
+    startSync();
 
     // Run update sequence in background
     (async () => {
@@ -129,6 +129,8 @@ const getHistoryCols = (onViewPO) => [
       } catch (err) {
         console.error("Failed to approve PO in background:", err);
         toast.error(`Failed to submit approval for PO ${poNumber}: ${err.message}`);
+      } finally {
+        endSync();
       }
     })();
   };

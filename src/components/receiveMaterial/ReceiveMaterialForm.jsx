@@ -23,7 +23,7 @@ const SectionLabel = ({ children }) => (
 
 export default function ReceiveMaterialForm({ open, onClose, record, groupIds }) {
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow, headers } = useData();
+  const { refresh, updateRow, headers, startSync, endSync } = useData();
   const [billFile, setBillFile] = useState(null);
   const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,6 +102,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     let billImageUrl = '';
     let biltyImageUrl = '';
     const folderId = import.meta.env.VITE_FOLDER_BILL;
@@ -269,6 +270,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       toast.error(err.message || "Failed to record receiving verification in database.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 

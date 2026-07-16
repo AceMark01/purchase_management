@@ -11,6 +11,7 @@ import { EditBtn, DeleteBtn } from '../../components/common/ActionButtons';
 import { toast } from 'react-toastify';
 import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
+import PremiumLoader from '../../components/common/PremiumLoader';
 import DataTable from '../../components/common/DataTable';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -249,7 +250,7 @@ function UserForm({ open, onClose, editItem, onSave }) {
         <Divider />
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={onClose} variant="outlined" disabled={submitting}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={submitting}>
+          <Button type="submit" variant="contained" disabled={submitting} startIcon={submitting ? <PremiumLoader size={16} /> : null}>
             {submitting ? 'Saving...' : (editItem ? 'Update' : 'Create') + ' User'}
           </Button>
         </DialogActions>

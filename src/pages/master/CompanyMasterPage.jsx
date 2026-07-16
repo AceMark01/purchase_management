@@ -21,6 +21,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
+import PremiumLoader from '../../components/common/PremiumLoader';
 import { formatDate, statusColor } from '../../utils/formatters';
 
 
@@ -67,9 +68,6 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
         disabled={submitting}
         {...register(name, {
           required: required ? `${label} is required` : false,
-          ...(name === 'email' ? { pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email' } } : {}),
-          ...(name === 'gstNumber' ? { pattern: { value: /^[0-9A-Z]{15}$/, message: 'GST must be 15 alphanumeric chars' } } : {}),
-          ...(name === 'panNumber' ? { pattern: { value: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, message: 'Invalid PAN format' } } : {}),
         })}
         error={!!errors[name]}
         helperText={errors[name]?.message}
@@ -102,7 +100,7 @@ function CompanyForm({ open, onClose, editItem, onSave }) {
         <Divider />
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={onClose} variant="outlined" color="inherit" disabled={submitting}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={submitting}>
+          <Button type="submit" variant="contained" disabled={submitting} startIcon={submitting ? <PremiumLoader size={16} /> : null}>
             {submitting ? 'Saving...' : (editItem ? 'Update Company' : 'Create Company')}
           </Button>
         </DialogActions>
@@ -123,7 +121,7 @@ const TABLE_COLUMNS = [
 
 export default function CompanyMasterPage() {
   const { isAdmin } = useAuth();
-  const { companies: items = [], refresh, updateRow } = useData();
+  const { companies: items = [], refresh, updateRow, startSync, endSync } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -164,61 +162,75 @@ export default function CompanyMasterPage() {
 
   const handleSave = async (data) => {
     const isEdit = !!selected;
-    try {
-      let result;
-      const payload = {
-        "Company Name": data.companyName,
-        "Email": data.email,
-        "Phone Number ": data.phoneNumber,
-        "GSTIN": data.gstNumber,
-        "PAN": data.panNumber,
-        "Billing Address": data.billingAddress,
-        "Shipping Address": data.shippingAddress,
-      };
+    const payload = {
+      "Company Name": data.companyName,
+      "Email": data.email,
+      "Phone Number ": data.phoneNumber,
+      "GSTIN": data.gstNumber,
+      "PAN": data.panNumber,
+      "Billing Address": data.billingAddress,
+      "Shipping Address": data.shippingAddress,
+    };
 
-      if (isEdit) {
-        await updateRow('companies', selected._row, payload, false);
-        result = { success: true };
-      } else {
-        const rowValues = [
-          payload["Company Name"],
-          payload["Email"],
-          payload["Phone Number "],
-          payload["GSTIN"],
-          payload["PAN"],
-          payload["Billing Address"],
-          payload["Shipping Address"],
-        ];
-        result = await gasApi.insertInColumns("Master-Company", 1, rowValues, 1);
-      }
+    // Close form immediately (optimistic UI) and start loader widget
+    startSync();
 
-      if (result.success) {
-        toast.success(isEdit ? 'Company updated!' : 'Company created!');
-        await refresh(['companiesData'], false);
-      } else {
-        throw new Error(result.error || "Save failed");
+    (async () => {
+      try {
+        let result;
+        if (isEdit) {
+          await updateRow('companies', selected._row, payload, false);
+          result = { success: true };
+        } else {
+          const rowValues = [
+            payload["Company Name"],
+            payload["Email"],
+            payload["Phone Number "],
+            payload["GSTIN"],
+            payload["PAN"],
+            payload["Billing Address"],
+            payload["Shipping Address"],
+          ];
+          result = await gasApi.insertInColumns("Master-Company", 1, rowValues, 1);
+        }
+
+        if (result.success) {
+          toast.success(isEdit ? 'Company updated!' : 'Company created!');
+          await refresh(['companiesData'], false);
+        } else {
+          throw new Error(result.error || "Save failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to save company.");
+      } finally {
+        endSync();
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to save company.");
-      throw err; // propagates to onSubmit finally to stop dismiss on error
-    }
+    })();
   };
 
   const handleDelete = async () => {
-    try {
-      const result = await gasApi.deleteRow("Master-Company", selected._row);
-      if (result.success) {
-        toast.success('Company deleted successfully!');
-        await refresh(['companiesData'], false);
+    const targetSelected = selected;
+    setDeleteOpen(false);
+    setSelected(null);
+    startSync();
+
+    (async () => {
+      try {
+        const result = await gasApi.deleteRow("Master-Company", targetSelected._row);
+        if (result.success) {
+          toast.success('Company deleted successfully!');
+          await refresh(['companiesData'], false);
+        } else {
+          throw new Error(result.error || "Delete failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to delete company.");
+      } finally {
+        endSync();
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to delete company.");
-    } finally {
-      setDeleteOpen(false);
-      setSelected(null);
-    }
+    })();
   };
 
   return (

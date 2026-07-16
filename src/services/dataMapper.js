@@ -420,14 +420,10 @@ export function mapWorkflowRecords(
       baseRecord.actual1 = actual1;
       baseRecord.timeDelay1 = timeDelay1;
 
-      if (planned1 && String(planned1).trim() !== "") {
-        if (!actual1 || String(actual1).trim() === "") {
-          baseRecord.workflowStage.receiveMaterial = 'Pending';
-        } else {
-          baseRecord.workflowStage.receiveMaterial = 'Completed';
-        }
+      if (!actual1 || String(actual1).trim() === "") {
+        baseRecord.workflowStage.receiveMaterial = 'Pending';
       } else {
-        baseRecord.workflowStage.receiveMaterial = null;
+        baseRecord.workflowStage.receiveMaterial = 'Completed';
       }
 
       baseRecord.liftNo = logistic["LN-Lift Number"] || logistic["LN-Lift Number "] || "";

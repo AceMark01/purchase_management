@@ -34,7 +34,7 @@ const getHistoryCols = (onViewPO) => [
 ];
 
 export default function SendPOToPartyPage() {
-  const { refresh, updateRow } = useData();
+  const { refresh, updateRow, startSync, endSync } = useData();
   const records  = useSelector((s) => s.workflow.records);
 
   const [tabValue,       setTabValue]       = useState(0);
@@ -85,7 +85,7 @@ export default function SendPOToPartyPage() {
     setFormOpen(false);
     setSelectedRow(null);
 
-    toast.info(`Sending PO ${poNumber} to ${partyName}...`);
+    startSync();
 
     // Run update sequence in background
     (async () => {
@@ -103,6 +103,8 @@ export default function SendPOToPartyPage() {
       } catch (err) {
         console.error("Failed to send PO in background:", err);
         toast.error(`Failed to send PO ${poNumber}: ${err.message}`);
+      } finally {
+        endSync();
       }
     })();
   };

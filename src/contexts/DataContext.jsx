@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-import { Backdrop, CircularProgress, Box, Typography, Card, Button } from '@mui/material';
+import { Backdrop, CircularProgress, Box, Typography, Card, Button, Paper } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PremiumLoader from '../components/common/PremiumLoader';
 import { gasApi } from '../services/gasApi';
 import { useAuth } from './AuthContext';
 import { mapProductRow, mapWhatsAppRow, mapWorkflowRecords, mapCompanyRow, mapVendorRow, mapUserRow } from '../services/dataMapper';
@@ -171,6 +172,20 @@ export function DataProvider({ children }) {
   });
   const [writeLoading, setWriteLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const activeSyncsRef = useRef(0);
+
+  const startSync = () => {
+    activeSyncsRef.current += 1;
+    setSyncing(true);
+  };
+
+  const endSync = () => {
+    activeSyncsRef.current = Math.max(0, activeSyncsRef.current - 1);
+    if (activeSyncsRef.current === 0) {
+      setSyncing(false);
+    }
+  };
   
   // Local states for loaded resources
   const [recordsState, setRecordsState] = useState([]);
@@ -186,7 +201,6 @@ export function DataProvider({ children }) {
   const [rawIndents, setRawIndents] = useState([]);
   const [rawApprovals, setRawApprovals] = useState([]);
   const [rawFollowUps, setRawFollowUps] = useState([]);
-  const [rawMasterData, setRawMasterData] = useState([]);
   const [rawVendorsData, setRawVendorsData] = useState([]);
   const [rawCompaniesData, setRawCompaniesData] = useState([]);
   const [rawProductsData, setRawProductsData] = useState([]);
@@ -217,7 +231,6 @@ export function DataProvider({ children }) {
           { key: "poHistory", name: "PO-History" },
           { key: "logistics", name: "LIFT-RECEIVED" },
           { key: "receiving", name: "RECEIVED-ACCOUNTS" },
-          { key: "masterData", name: "Master Data" },
           { key: "users", name: "LOGIN" },
           { key: "vendorsData", name: "Master-Vendors" },
           { key: "productsData", name: "Master-Products" },
@@ -244,7 +257,6 @@ export function DataProvider({ children }) {
       const followUpsRaw = fetchedData.followUps !== undefined ? fetchedData.followUps : rawFollowUps;
       const logisticsRaw = fetchedData.logistics !== undefined ? fetchedData.logistics : rawLogistics2D;
       const receivingRaw = fetchedData.receiving !== undefined ? fetchedData.receiving : rawReceiving2D;
-      const masterDataRaw = fetchedData.masterData !== undefined ? fetchedData.masterData : rawMasterData;
       const vendorsDataRaw = fetchedData.vendorsData !== undefined ? fetchedData.vendorsData : rawVendorsData;
       const productsDataRaw = fetchedData.productsData !== undefined ? fetchedData.productsData : rawProductsData;
       const companiesDataRaw = fetchedData.companiesData !== undefined ? fetchedData.companiesData : rawCompaniesData;
@@ -261,7 +273,6 @@ export function DataProvider({ children }) {
         followUps: followUpsRaw.length,
         logistics: logisticsRaw.length,
         receiving: receivingRaw.length,
-        masterData: masterDataRaw.length,
         users: usersRaw.length,
         poHistory: poHistoryRaw.length,
       });
@@ -272,7 +283,6 @@ export function DataProvider({ children }) {
       if (fetchedData.followUps !== undefined || !sheetsToFetch) setRawFollowUps(followUpsRaw);
       if (fetchedData.logistics !== undefined || !sheetsToFetch) setRawLogistics2D(logisticsRaw);
       if (fetchedData.receiving !== undefined || !sheetsToFetch) setRawReceiving2D(receivingRaw);
-      if (fetchedData.masterData !== undefined || !sheetsToFetch) setRawMasterData(masterDataRaw);
       if (fetchedData.vendorsData !== undefined || !sheetsToFetch) setRawVendorsData(vendorsDataRaw);
       if (fetchedData.companiesData !== undefined || !sheetsToFetch) setRawCompaniesData(companiesDataRaw);
       if (fetchedData.productsData !== undefined || !sheetsToFetch) setRawProductsData(productsDataRaw);
@@ -362,13 +372,11 @@ export function DataProvider({ children }) {
       }));
 
 
-      const fullHeaders = (masterDataRaw[1] || []).map(h => String(h || "").trim());
       setHeadersState({
         ...headersMap,
         products: productHeaders,
         companies: companyHeaders,
         vendors: vendorHeaders,
-        masterData: fullHeaders,
         users: userHeaders
       });
 
@@ -434,7 +442,6 @@ export function DataProvider({ children }) {
         id: row._row || (idx + 1),
         _row: row._row,
         timestamp: row["Timestamp"] || "",
-        actual: row["Actual"] || "",
         partyName: row["Party Name"] || "",
         poNumber: row["Po Number"] || "",
         productCode: row["Product Code"] || "",
@@ -449,7 +456,7 @@ export function DataProvider({ children }) {
         totalAmount: parseNum(row["Total Amount"]),
         poCopy: row["PO Copy"] || "",
         indentNumber: row["Indent No."] || "",
-        serialNo: parseNum(row["Product No."]),
+        serialNo: parseNum(row["Serial No."]),
         companyName: row["Company Name"] || "",
         
         // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
@@ -619,6 +626,7 @@ export function DataProvider({ children }) {
     
     if (showSpinner) setWriteLoading(true);
     try {
+      const cells = [];
       for (const [colName, value] of Object.entries(columnValues)) {
         let absoluteColIdx = -1;
         if (colName.startsWith("col-")) {
@@ -634,8 +642,11 @@ export function DataProvider({ children }) {
           }
         }
         if (absoluteColIdx > 0) {
-          await gasApi.updateCell(sheetName, rowIndex, absoluteColIdx, value);
+          cells.push({ rowIndex, columnIndex: absoluteColIdx, value });
         }
+      }
+      if (cells.length > 0) {
+        await gasApi.updateCells(sheetName, cells);
       }
     } finally {
       if (showSpinner) setWriteLoading(false);
@@ -686,7 +697,9 @@ export function DataProvider({ children }) {
         pendingPoRecords,
         productTypes: productTypesState,
         units: unitsState,
-        orderByList: orderByListState
+        orderByList: orderByListState,
+        startSync,
+        endSync
       }}
     >
       {children}
@@ -703,6 +716,64 @@ export function DataProvider({ children }) {
           </Typography>
         </Box>
       </Backdrop>
+
+      {/* Floating Background Sync Status widget */}
+      {syncing && (
+        <Paper
+          elevation={4}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.25,
+            borderRadius: '50px',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            animation: 'premium-fade-in 0.3s ease-out',
+            '@keyframes premium-fade-in': {
+              '0%': { opacity: 0, transform: 'translateY(10px)' },
+              '100%': { opacity: 1, transform: 'translateY(0)' },
+            },
+          }}
+        >
+          <PremiumLoader size={18} />
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{
+              color: 'text.primary',
+              fontSize: '0.82rem',
+              letterSpacing: '0.01em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            Syncing Live Data
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: 'success.main',
+                animation: 'pulse 1.2s infinite ease-in-out',
+                '@keyframes pulse': {
+                  '0%': { transform: 'scale(0.8)', opacity: 0.5, boxShadow: '0 0 0 0 rgba(46, 125, 50, 0.7)' },
+                  '70%': { transform: 'scale(1)', opacity: 1, boxShadow: '0 0 0 6px rgba(46, 125, 50, 0)' },
+                  '100%': { transform: 'scale(0.8)', opacity: 0.5, boxShadow: '0 0 0 0 rgba(46, 125, 50, 0)' },
+                },
+              }}
+            />
+          </Typography>
+        </Paper>
+      )}
     </DataContext.Provider>
   );
 }

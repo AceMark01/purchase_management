@@ -56,7 +56,6 @@ export const gasApi = {
       { key: "poHistory", name: "PO-History" },
       { key: "logistics", name: "LIFT-RECEIVED" },
       { key: "receiving", name: "RECEIVED-ACCOUNTS" },
-      { key: "masterData", name: "Master Data" },
       { key: "users", name: "LOGIN" },
       { key: "vendorsData", name: "Master-Vendors" },
       { key: "productsData", name: "Master-Products" },
@@ -96,6 +95,8 @@ export const gasApi = {
   deleteRowInColumns: (sheetName, rowIndex, startCol, numCols) =>
     post({ action: 'deleteRowInColumns', sheetName, rowIndex, startCol, numCols }),
   updateCell: (sheetName, rowIndex, columnIndex, value) => post({ action: 'updateCell', sheetName, rowIndex, columnIndex, value }),
+  updateCells: (sheetName, cells) => post({ action: 'updateCells', sheetName, cells: JSON.stringify(cells) }),
+  updateRange: (sheetName, rowIndex, startCol, values) => post({ action: 'updateRange', sheetName, rowIndex, startCol, values: JSON.stringify(values) }),
   deleteRow: (sheetName, rowIndex) => post({ action: 'delete', sheetName, rowIndex }),
   uploadFile: (data) => post({ action: 'uploadFile', ...data }),
   updateFullRow: (sheetName, rowIndex, rowData) => post({ action: 'update', sheetName, rowIndex, rowData: JSON.stringify(rowData) }),

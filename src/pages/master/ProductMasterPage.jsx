@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Button, Typography, Chip, Dialog, DialogTitle, DialogContent,
   DialogActions, Grid, TextField, MenuItem, Divider, IconButton, Tooltip,
@@ -13,6 +13,7 @@ import DataTable  from '../../components/common/DataTable';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
+import PremiumLoader from '../../components/common/PremiumLoader';
 import { formatCurrency } from '../../utils/formatters';
 
 const COLUMNS = [
@@ -30,24 +31,24 @@ function ProductForm({ open, onClose, editItem, onSave }) {
   const { vendors = [], productTypes = [], units = [] } = useData();
   const [submitting, setSubmitting] = useState(false);
 
-  const { register, control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
+  const uniqueVendors = useMemo(() => {
+    const seen = new Set();
+    return vendors.filter(v => {
+      const name = String(v.vendorName || '').trim();
+      if (!name || seen.has(name.toLowerCase())) {
+        return false;
+      }
+      seen.add(name.toLowerCase());
+      return true;
+    });
+  }, [vendors]);
+
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     defaultValues: {
       productType: '', vendorId: '', vendorName: '', groupName: '',
       itemName: '', unit: '', itemCode: '', purchaseRate: '',
     },
   });
-
-  const selectedVendorName = watch('vendorName');
-  useEffect(() => {
-    if (selectedVendorName) {
-      const ven = vendors.find(v => v.vendorName === selectedVendorName);
-      if (ven) {
-        setValue('vendorId', ven.vendorId || '');
-      }
-    } else {
-      setValue('vendorId', '');
-    }
-  }, [selectedVendorName, vendors, setValue]);
 
   useEffect(() => {
     if (editItem) {
@@ -90,8 +91,15 @@ function ProductForm({ open, onClose, editItem, onSave }) {
       <Divider />
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent sx={{ pt: 2.5 }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' },
+              gap: 2.5
+            }}
+          >
+            {/* Row 1 */}
+            <Box>
               <Controller name="productType" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
                 <TextField {...f} select fullWidth size="small" label="Product Type" error={!!errors.productType} helperText={errors.productType?.message} sx={INPUT_SX} disabled={submitting}>
                   {productTypes.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
@@ -100,27 +108,53 @@ function ProductForm({ open, onClose, editItem, onSave }) {
                   )}
                 </TextField>
               )} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
+            </Box>
+            <Box>
               <Controller name="vendorName" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
-                <TextField {...f} select fullWidth size="small" label="Vendor Name" error={!!errors.vendorName} helperText={errors.vendorName?.message} sx={INPUT_SX} disabled={submitting}>
-                  {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
+                <TextField
+                  {...f}
+                  select
+                  fullWidth
+                  size="small"
+                  label="Vendor Name"
+                  error={!!errors.vendorName}
+                  helperText={errors.vendorName?.message}
+                  sx={INPUT_SX}
+                  disabled={submitting}
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    f.onChange(selectedVal);
+                    const ven = uniqueVendors.find(v => String(v.vendorName).trim().toLowerCase() === String(selectedVal).trim().toLowerCase());
+                    setValue('vendorId', ven ? ven.vendorId : '');
+                  }}
+                >
+                  {uniqueVendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                 </TextField>
               )} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth size="small" label="Vendor ID"
-                InputProps={{ readOnly: true }}
-                InputLabelProps={{ shrink: true }}
-                sx={INPUT_SX}
-                disabled={submitting}
-                {...register('vendorId')}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>{field('groupName', 'Group Name')}</Grid>
-            <Grid item xs={12} sm={6}>{field('itemName', 'Item Name')}</Grid>
-            <Grid item xs={12} sm={6}>
+            </Box>
+            <Box>
+              <Controller name="vendorId" control={control} render={({ field: f }) => (
+                <TextField
+                  {...f}
+                  fullWidth
+                  size="small"
+                  label="Vendor ID"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{ readOnly: true }}
+                  inputProps={{ readOnly: true, style: { pointerEvents: 'none' } }}
+                  sx={INPUT_SX}
+                  disabled={submitting}
+                />
+              )} />
+            </Box>
+
+            {/* Row 2 */}
+            <Box>{field('groupName', 'Group Name')}</Box>
+            <Box>{field('itemName', 'Item Name')}</Box>
+            <Box>{field('itemCode', 'Item Code')}</Box>
+
+            {/* Row 3 */}
+            <Box>
               <Controller name="unit" control={control} rules={{ required: 'Required' }} render={({ field: f }) => (
                 <TextField {...f} select fullWidth size="small" label="Unit" error={!!errors.unit} helperText={errors.unit?.message} sx={INPUT_SX} disabled={submitting}>
                   {units.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
@@ -129,15 +163,14 @@ function ProductForm({ open, onClose, editItem, onSave }) {
                   )}
                 </TextField>
               )} />
-            </Grid>
-            <Grid item xs={12} sm={6}>{field('itemCode', 'Item Code')}</Grid>
-            <Grid item xs={12} sm={6}>{field('purchaseRate', 'Purchase Rate', { type: 'number' })}</Grid>
-          </Grid>
+            </Box>
+            <Box>{field('purchaseRate', 'Purchase Rate', { type: 'number' })}</Box>
+          </Box>
         </DialogContent>
         <Divider />
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={onClose} variant="outlined" disabled={submitting}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={submitting}>
+          <Button type="submit" variant="contained" disabled={submitting} startIcon={submitting ? <PremiumLoader size={16} /> : null}>
             {submitting ? 'Saving...' : (editItem ? 'Update' : 'Add') + ' Product'}
           </Button>
         </DialogActions>
@@ -148,66 +181,78 @@ function ProductForm({ open, onClose, editItem, onSave }) {
 
 export default function ProductMasterPage() {
   const { isAdmin } = useAuth();
-  const { products, refresh, updateRow } = useData();
+  const { products, refresh, updateRow, startSync, endSync } = useData();
   const [formOpen, setFormOpen]  = useState(false);
   const [editItem, setEditItem]  = useState(null);
 
   const handleSave = async item => {
     const existing = products.find(p => p.itemCode === item.itemCode);
     const isEdit = !!existing;
-    try {
-      let result;
-      const payload = {
-        "Product Type": item.productType,
-        "Vendor-ID": item.vendorId,
-        "Vendor Name": item.vendorName,
-        "Group Name": item.groupName,
-        "Item Name": item.itemName,
-        "Unit": item.unit,
-        "Item Code": item.itemCode,
-        "Purchase Rate": Number(item.purchaseRate) || 0,
-      };
-      if (isEdit) {
-        await updateRow('products', existing._row, payload, false);
-        result = { success: true };
-      } else {
-        const rowValues = [
-          payload["Product Type"],
-          payload["Vendor-ID"],
-          payload["Vendor Name"],
-          payload["Group Name"],
-          payload["Item Name"],
-          payload["Unit"],
-          payload["Item Code"],
-          payload["Purchase Rate"]
-        ];
-        result = await gasApi.insertInColumns("Master-Products", 1, rowValues, 1);
+    startSync();
+
+    (async () => {
+      try {
+        let result;
+        const payload = {
+          "Product Type": item.productType,
+          "Vendor-ID": item.vendorId,
+          "Vendor Name": item.vendorName,
+          "Group Name": item.groupName,
+          "Item Name": item.itemName,
+          "Unit": item.unit,
+          "Item Code": item.itemCode,
+          "Purchase Rate": Number(item.purchaseRate) || 0,
+        };
+        if (isEdit) {
+          await updateRow('products', existing._row, payload, false);
+          result = { success: true };
+        } else {
+          const rowValues = [
+            payload["Product Type"],
+            payload["Vendor-ID"],
+            payload["Vendor Name"],
+            payload["Group Name"],
+            payload["Item Name"],
+            payload["Unit"],
+            payload["Item Code"],
+            payload["Purchase Rate"]
+          ];
+          result = await gasApi.insertInColumns("Master-Products", 1, rowValues, 1);
+        }
+        if (result.success) {
+          toast.success(isEdit ? 'Product updated!' : 'Product added!');
+          await refresh(['productsData'], false);
+        } else {
+          throw new Error(result.error || "Save failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to save product.");
+      } finally {
+        endSync();
       }
-      if (result.success) {
-        toast.success(isEdit ? 'Product updated!' : 'Product added!');
-        await refresh(['productsData'], false);
-      } else {
-        throw new Error(result.error || "Save failed");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to save product.");
-      throw err; // propagates to onSubmit finally to stop dismiss on error
-    }
+    })();
   };
 
   const handleDelete = async row => {
     if (!window.confirm(`Are you sure you want to delete product "${row.itemName}"?`)) return;
-    try {
-      const result = await gasApi.deleteRow("Master-Products", row._row);
-      if (result.success) {
-        toast.success('Product deleted.');
-        await refresh(['productsData'], false);
+    startSync();
+    (async () => {
+      try {
+        const result = await gasApi.deleteRow("Master-Products", row._row);
+        if (result.success) {
+          toast.success('Product deleted.');
+          await refresh(['productsData'], false);
+        } else {
+          throw new Error(result.error || "Delete failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to delete product.");
+      } finally {
+        endSync();
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to delete product.");
-    }
+    })();
   };
 
   const actions = row => {

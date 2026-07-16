@@ -21,6 +21,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { gasApi } from '../../services/gasApi';
+import PremiumLoader from '../../components/common/PremiumLoader';
 import { formatDate } from '../../utils/formatters';
 
 /* ── helpers ──────────────────────────────────────────────── */
@@ -96,7 +97,7 @@ function VendorForm({ open, onClose, editItem, onSave }) {
         <Divider />
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={onClose} variant="outlined" color="inherit" disabled={submitting}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={submitting}>
+          <Button type="submit" variant="contained" disabled={submitting} startIcon={submitting ? <PremiumLoader size={16} /> : null}>
             {submitting ? 'Saving...' : (editItem ? 'Update Vendor' : 'Create Vendor')}
           </Button>
         </DialogActions>
@@ -109,16 +110,16 @@ function VendorForm({ open, onClose, editItem, onSave }) {
 const TABLE_COLUMNS = [
   { id: 'vendorId', label: 'Vendor ID', minWidth: 100 },
   { id: 'vendorName', label: 'Vendor Name', minWidth: 160 },
-  { id: 'contactPerson', label: 'Contact Person Name', minWidth: 160 },
-  { id: 'phoneNumber', label: 'Phone Number', minWidth: 130 },
+  { id: 'contactPerson', label: 'Contact Person Name', minWidth: 150 },
+  { id: 'phoneNumber', label: 'Phone Number', minWidth: 120 },
   { id: 'email', label: 'Email Address', minWidth: 170 },
-  { id: 'gstNumber', label: 'GST Number', minWidth: 160 },
-  { id: 'vendorLocation', label: 'Vendor Location', minWidth: 160 },
+  { id: 'gstNumber', label: 'GST Number', minWidth: 150 },
+  { id: 'vendorLocation', label: 'Vendor Location', minWidth: 150 },
 ];
 
 export default function VendorMasterPage() {
   const { isAdmin } = useAuth();
-  const { vendors: items = [], refresh, updateRow, loading } = useData();
+  const { vendors: items = [], refresh, updateRow, loading, startSync, endSync } = useData();
 
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -159,71 +160,84 @@ export default function VendorMasterPage() {
 
   const handleSave = async (data) => {
     const isEdit = !!selected;
-    try {
-      let result;
-      if (isEdit) {
-        const payload = {
-          "Vendor-ID": selected.vendorId,
-          "Vendor Name": data.vendorName,
-          "Contact Person Name": data.contactPerson,
-          "Phone Number": data.phoneNumber,
-          "Email Address": data.email,
-          "GST Number": data.gstNumber,
-          "Vendor Location": data.vendorLocation,
-        };
-        await updateRow('vendors', selected._row, payload, false);
-        result = { success: true };
-      } else {
-        let nextId = "VI-001";
-        if (items.length > 0) {
-          const ids = items
-            .map(item => {
-              const match = String(item.vendorId || '').match(/VI-(\d+)/);
-              return match ? parseInt(match[1], 10) : 0;
-            })
-            .filter(Boolean);
-          const maxId = ids.length > 0 ? Math.max(...ids) : 0;
-          nextId = `VI-${String(maxId + 1).padStart(3, '0')}`;
-        }
-        const rowValues = [
-          nextId,
-          data.vendorName,
-          data.contactPerson,
-          data.phoneNumber,
-          data.email,
-          data.gstNumber,
-          data.vendorLocation
-        ];
-        result = await gasApi.insertInColumns("Master-Vendors", 1, rowValues, 1);
-      }
+    startSync();
 
-      if (result.success) {
-        toast.success(isEdit ? 'Vendor updated!' : 'Vendor created!');
-        await refresh(['vendorsData'], false);
-      } else {
-        throw new Error(result.error || "Save failed");
+    (async () => {
+      try {
+        let result;
+        if (isEdit) {
+          const payload = {
+            "Vendor-ID": selected.vendorId,
+            "Vendor Name": data.vendorName,
+            "Contact Person Name": data.contactPerson,
+            "Phone Number": data.phoneNumber,
+            "Email Address": data.email,
+            "GST Number": data.gstNumber,
+            "Vendor Location": data.vendorLocation,
+          };
+          await updateRow('vendors', selected._row, payload, false);
+          result = { success: true };
+        } else {
+          let nextId = "VI-001";
+          if (items.length > 0) {
+            const ids = items
+              .map(item => {
+                const match = String(item.vendorId || '').match(/VI-(\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(Boolean);
+            const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+            nextId = `VI-${String(maxId + 1).padStart(3, '0')}`;
+          }
+          const rowValues = [
+            nextId,
+            data.vendorName,
+            data.contactPerson,
+            data.phoneNumber,
+            data.email,
+            data.gstNumber,
+            data.vendorLocation
+          ];
+          result = await gasApi.insertInColumns("Master-Vendors", 1, rowValues, 1);
+        }
+
+        if (result.success) {
+          toast.success(isEdit ? 'Vendor updated!' : 'Vendor created!');
+          await refresh(['vendorsData'], false);
+        } else {
+          throw new Error(result.error || "Save failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to save vendor.");
+      } finally {
+        endSync();
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to save vendor.");
-      throw err; // propagates to onSubmit finally to stop dismiss on error
-    }
+    })();
   };
 
   const handleDelete = async () => {
-    try {
-      const result = await gasApi.deleteRow("Master-Vendors", selected._row);
-      if (result.success) {
-        toast.success('Vendor deleted successfully!');
-        await refresh(['vendorsData'], false);
+    const targetSelected = selected;
+    setDeleteOpen(false);
+    setSelected(null);
+    startSync();
+
+    (async () => {
+      try {
+        const result = await gasApi.deleteRow("Master-Vendors", targetSelected._row);
+        if (result.success) {
+          toast.success('Vendor deleted successfully!');
+          await refresh(['vendorsData'], false);
+        } else {
+          throw new Error(result.error || "Delete failed");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to delete vendor.");
+      } finally {
+        endSync();
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to delete vendor.");
-    } finally {
-      setDeleteOpen(false);
-      setSelected(null);
-    }
+    })();
   };
 
   return (

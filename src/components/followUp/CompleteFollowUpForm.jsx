@@ -25,7 +25,7 @@ const SectionLabel = ({ children }) => (
 export default function CompleteFollowUpForm({ open, onClose, selectedRow, groupIds }) {
   const dispatch = useDispatch();
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow, headers } = useData();
+  const { refresh, updateRow, headers, startSync, endSync } = useData();
 
   const [biltyFile, setBiltyFile] = useState(null);
   const [billFile, setBillFile] = useState(null);
@@ -102,6 +102,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     try {
       if (data.followUpStatus === 'Direct Receiving') {
         // 1. Upload Bilty image (if any)
@@ -182,35 +183,18 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
         toast.success(`Direct Receiving completed! Lift Number ${generatedLiftNumber} generated.`);
       } else {
         // Other statuses (Arrange Logistics, Further Follow Up, Cancel): submit to Flw-up sheet
-        const headersList = headers?.followUps || [
-          "Timestamp",
-          "Indent No.",
-          "S-No.",
-          "Follow-up Status",
-          "Excepted Arrival Date",
-          "Remark",
-          "Follow Up By",
-          "Next Follow-up Date",
-          "Actual"
-        ];
-
         const timestamp = formatTimestamp();
 
-        const rowsData = matchedRecords.map(record => {
-          const rowObj = {
-            "Timestamp": timestamp,
-            "Indent No.": record.indentNumber,
-            "S-No.": record.serialNo,
-            "Follow-up Status": data.followUpStatus,
-            "Excepted Arrival Date": "",
-            "Remark": data.remarks,
-            "Follow Up By": data.followUpBy,
-            "Next Follow-up Date": (data.followUpStatus === 'Further Follow Up' || data.followUpStatus === 'Arrange Logistics') ? data.nextFollowDate : '',
-            "CodeNO": "",
-            "Actual": (data.followUpStatus === 'Further Follow Up' || data.followUpStatus === 'Arrange Logistics') ? "" : timestamp
-          };
-          return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
-        });
+        const rowsData = matchedRecords.map(record => [
+          timestamp,                                                                             // A: Timestamp
+          record.indentNumber || "",                                                            // B: Indent No.
+          record.serialNo || "",                                                                // C: S-No.
+          data.followUpStatus || "",                                                            // D: Follow-up Status
+          data.followUpBy || "",                                                                // E: Follow Up By
+          data.followUpStatus === 'Further Follow Up' ? (data.nextFollowDate || "") : "",       // F: Next Follow-up Date
+          data.followUpStatus === 'Arrange Logistics' ? (data.expectedArrivalDate || "") : "",   // G: Expected Arrival Date
+          data.remarks || ""                                                                    // H: Remark
+        ]);
 
         const result = await gasApi.batchInsert("Flw-up", rowsData);
         if (!result.success) {
@@ -240,6 +224,7 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
       toast.error(err.message || "Failed to save follow-up record to database.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 
@@ -269,8 +254,8 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
           <SectionLabel>Follow Up Information</SectionLabel>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-            <Grid container spacing={2.5}>
-              <Grid item xs={4}>
+            <Box sx={{ display: 'flex', gap: 2.5 }}>
+              <Box sx={{ flex: '1 1 0px', maxWidth: '33.333%', minWidth: 0 }}>
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
                   Follow Up Status <span style={{ color: 'red' }}>*</span>
                 </Typography>
@@ -283,31 +268,43 @@ export default function CompleteFollowUpForm({ open, onClose, selectedRow, group
                       <MenuItem value="Cancel">Cancel</MenuItem>
                     </TextField>
                   )} />
-              </Grid>
+              </Box>
 
               {followUpStatus && followUpStatus !== 'Cancel' && (
-                <Grid item xs={4}>
+                <Box sx={{ flex: '1 1 0px', maxWidth: '33.333%', minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
                     Follow Up By <span style={{ color: 'red' }}>*</span>
                   </Typography>
                   <TextField fullWidth size="small"
                     {...register('followUpBy', { required: 'Required' })}
                     error={!!errors.followUpBy} helperText={errors.followUpBy?.message} />
-                </Grid>
+                </Box>
               )}
 
-              {(followUpStatus === 'Further Follow Up' || followUpStatus === 'Arrange Logistics' || followUpStatus === 'Direct Receiving') && (
-                <Grid item xs={4}>
+              {followUpStatus === 'Further Follow Up' && (
+                <Box sx={{ flex: '1 1 0px', maxWidth: '33.333%', minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                    Next Follow Up Date {followUpStatus === 'Further Follow Up' && <span style={{ color: 'red' }}>*</span>}
+                    Next Follow Up Date <span style={{ color: 'red' }}>*</span>
                   </Typography>
                   <TextField fullWidth type="date" size="small"
-                    {...register('nextFollowDate', { required: followUpStatus === 'Further Follow Up' ? 'Required' : false })}
+                    {...register('nextFollowDate', { required: 'Required' })}
                     InputLabelProps={{ shrink: true }}
                     error={!!errors.nextFollowDate} helperText={errors.nextFollowDate?.message} />
-                </Grid>
+                </Box>
               )}
-            </Grid>
+
+              {followUpStatus === 'Arrange Logistics' && (
+                <Box sx={{ flex: '1 1 0px', maxWidth: '33.333%', minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                    Expected Arrival Date <span style={{ color: 'red' }}>*</span>
+                  </Typography>
+                  <TextField fullWidth type="date" size="small"
+                    {...register('expectedArrivalDate', { required: 'Required' })}
+                    InputLabelProps={{ shrink: true }}
+                    error={!!errors.expectedArrivalDate} helperText={errors.expectedArrivalDate?.message} />
+                </Box>
+              )}
+            </Box>
 
             {followUpStatus && (
               <Box>

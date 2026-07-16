@@ -10,10 +10,10 @@ import SaveIcon from '@mui/icons-material/Save';
 import { toast } from 'react-toastify';
 import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
+import PremiumLoader from '../common/PremiumLoader';
 import { formatCurrency, formatDate, formatTimestamp } from '../../utils/formatters';
 import aceLogo from '../../assets/ace-logo.png';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { generatePoPdfBlob } from './pdf-generate';
 
 const generatePONumber = () => `ACE/PO/25-26-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
@@ -45,7 +45,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   const vendors = useSelector((state) => state.vendorMaster.items) || [];
   const companies = useSelector((state) => state.companies.items) || [];
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [] } = useData();
+  const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [], startSync, endSync } = useData();
 
   const { control, register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
@@ -256,6 +256,21 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   const emptyRowsCount = 1;
   const emptyRows = Array.from({ length: emptyRowsCount });
 
+  const handlePrint = async () => {
+    setSubmitting(true);
+    try {
+      toast.info("Generating PDF for printing...");
+      const pdfBlob = await generatePoPdfBlob(watch());
+      const url = URL.createObjectURL(pdfBlob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate PDF for printing.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── Save & Submit ─────────────────────────────────────────────────────
   const onSubmit = async () => {
     if (isViewMode || submitting) return;
@@ -271,29 +286,18 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
     if (matchedIndents.length === 0) { toast.error('No pending indents to process.'); return; }
 
+    if (startSync) startSync();
+
     try {
       toast.info("Generating PO PDF...");
-      const element = document.getElementById("printable-po-content");
-      if (!element) {
-        throw new Error("Printable PO content element not found in DOM");
-      }
-
-      // Capture element to canvas
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false
+      const pdfBlob = await generatePoPdfBlob(data);
+      
+      const pdfBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(pdfBlob);
       });
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-      // Proportional dimensions matching the container aspect ratio
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-      const pdfBase64 = pdf.output('datauristring');
 
       toast.info("Uploading PDF to Google Drive...");
       const folderId = import.meta.env.VITE_FOLDER_PO;
@@ -328,23 +332,22 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
         historyRows.push([
           formatTimestamp(new Date()), // Timestamp (A)
-          formatTimestamp(new Date()), // Actual (B)
-          data.vendorName || "",       // Party Name (C)
-          data.poNumber || "",         // Po Number (D)
-          indent.itemCode || "",       // Product Code (E)
-          indent.itemName || "",       // Product (F)
-          indent.description || "",    // Description (G)
-          poQty,                       // Quntity (H)
-          indent.unit || "",           // Unit (I)
-          poRate,                      // Rate (J)
-          poDiscount,                  // Discount% stored as percentage (K)
-          poGst,                       // Gst % (L)
-          discounted,                  // Amount (M)
-          total,                       // Total Amount (N)
-          fileUrl,                     // PO Copy (O)
-          indent.indentNumber || "",   // Indent No. (P)
-          indent.serialNo,             // Product No. (Q)
-          data.companyName || ""       // Company Name (R)
+          indent.indentNumber || "",   // Indent No. (B)
+          indent.serialNo,             // Serial No. (C)
+          data.vendorName || "",       // Party Name (D)
+          data.poNumber || "",         // Po Number (E)
+          indent.itemCode || "",       // Product Code (F)
+          indent.itemName || "",       // Product (G)
+          indent.description || "",    // Description (H)
+          poQty,                       // Quntity (I)
+          indent.unit || "",           // Unit (J)
+          poRate,                      // Rate (K)
+          poDiscount,                  // Discount% (L)
+          poGst,                       // Gst % (M)
+          discounted,                  // Amount (N)
+          total,                       // Total Amount (O)
+          fileUrl,                     // PO Copy (P)
+          data.companyName || ""       // Company Name (Q)
         ]);
       }
 
@@ -352,11 +355,16 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
       onClose();
-      // Start background refresh without global spinner
-      refresh(['indents', 'poHistory'], false).catch(err => console.error("Background refresh failed:", err));
+      // Start background refresh without global spinner, cleanup sync status at end
+      refresh(['indents', 'poHistory'], false)
+        .catch(err => console.error("Background refresh failed:", err))
+        .finally(() => {
+          if (endSync) endSync();
+        });
     } catch (err) {
       console.error("Failed to generate PO:", err);
       toast.error(err.message || "Failed to write PO details to spreadsheet.");
+      if (endSync) endSync();
     } finally {
       setSubmitting(false);
     }
@@ -372,6 +380,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     >
       {/* ── Top Action Bar (non-printable) ─────────────────────────────── */}
       <Box className="no-print" sx={{
+        '@media print': { display: 'none' },
         p: 1.5, bgcolor: 'grey.200', display: 'flex', justifyContent: 'space-between',
         alignItems: 'center', borderBottom: 1, borderColor: 'divider',
         position: 'sticky', top: 0, zIndex: 10,
@@ -380,13 +389,13 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           {isViewMode ? `View PO: ${viewRecord?.poNumber}` : 'Generate Purchase Order'}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={submitting}>Print</Button>
+          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={handlePrint} disabled={submitting}>Print</Button>
           {!isViewMode && (
             <Button
               variant="contained"
               size="small"
               color="primary"
-              startIcon={<SaveIcon />}
+              startIcon={submitting ? <PremiumLoader size={16} /> : <SaveIcon />}
               onClick={handleSubmit(onSubmit)}
               disabled={submitting}
             >
@@ -398,7 +407,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       </Box>
 
       {/* ── Printable PO Template ──────────────────────────────────────── */}
-      <DialogContent sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fff', '@media print': { p: 0 } }}>
+      <DialogContent sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fff' }}>
         <Box
           id="printable-po-content"
           sx={{
@@ -444,32 +453,10 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             <Box sx={{ flex: 1, p: 1, borderRight: '2px solid #000' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>Supplier:- </Typography>
-                {isViewMode ? (
-                  <Typography variant="caption" fontWeight={700} sx={{ flex: 1, color: '#1976d2', fontSize: '0.75rem' }}>
-                    {data.vendorName || '—'}
-                  </Typography>
-                ) : (
-                  <Controller name="supplierId" control={control} render={({ field }) => (
-                    <TextField
-                      {...field} select variant="standard"
-                      SelectProps={{ disableUnderline: true, style: { fontSize: '0.75rem', fontWeight: 600, color: '#1976d2' } }}
-                      sx={{ flex: 1, '& .MuiSelect-select': { p: 0 } }}
-                    >
-                      <MenuItem value="" disabled>
-                        {availableVendors.length === 0 ? 'No pending indents' : 'Select Supplier...'}
-                      </MenuItem>
-                      {availableVendors.map(v => <MenuItem key={v.vendorId || v.id} value={v.vendorId}>{v.vendorName}</MenuItem>)}
-                      {field.value && !availableVendors.some(v => v.vendorId === field.value) && (
-                        (() => {
-                          const currentVen = vendors.find(v => v.vendorId === field.value);
-                          return currentVen ? (
-                            <MenuItem key={currentVen.vendorId || currentVen.id} value={currentVen.vendorId}>{currentVen.vendorName}</MenuItem>
-                          ) : null;
-                        })()
-                      )}
-                    </TextField>
-                  )} />
-                )}
+                <Typography variant="caption" fontWeight={700} sx={{ flex: 1, color: '#1976d2', fontSize: '0.75rem' }}>
+                  {data.vendorName || '—'}
+                </Typography>
+                <input type="hidden" {...register('supplierId')} />
               </Box>
               <Box sx={{ display: 'flex', mb: 0.5 }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>Address:- </Typography>
@@ -483,11 +470,11 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             <Box sx={{ width: '300px', p: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>PO No : </Typography>
-                <TransparentInput {...register('poNumber')} readOnly={isViewMode} />
+                <TransparentInput {...register('poNumber')} readOnly={true} />
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>PO Date : </Typography>
-                <TransparentInput type="date" {...register('poDate')} readOnly={isViewMode} />
+                <TransparentInput type="date" {...register('poDate')} readOnly={true} />
               </Box>
             </Box>
           </Box>
@@ -498,22 +485,22 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
               <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Our Commercial Details</Typography>
               <Box sx={{ display: 'flex', borderBottom: '1px solid #000' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px', borderRight: '1px solid #000', p: 0.5 }}>GSTIN</Typography>
-                <Box sx={{ flex: 1, p: 0.5 }}><TransparentInput {...register('companyGst')} readOnly={isViewMode} /></Box>
+                <Box sx={{ flex: 1, p: 0.5 }}><TransparentInput {...register('companyGst')} readOnly={true} /></Box>
               </Box>
               <Box sx={{ display: 'flex' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px', borderRight: '1px solid #000', p: 0.5 }}>PAN No.</Typography>
-                <Box sx={{ flex: 1, p: 0.5 }}><TransparentInput {...register('companyPan')} readOnly={isViewMode} /></Box>
+                <Box sx={{ flex: 1, p: 0.5 }}><TransparentInput {...register('companyPan')} readOnly={true} /></Box>
               </Box>
             </Box>
             <Box sx={{ textAlign: 'center', borderRight: '1px solid #000', display: 'flex', flexDirection: 'column' }}>
               <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Billing Address</Typography>
-              <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
-              <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('billingAddress')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></Box>
+              <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={true} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
+              <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('billingAddress')} readOnly={true} inputProps={{ style: { textAlign: 'center' } }} /></Box>
             </Box>
             <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
               <Typography variant="caption" fontWeight={700} sx={{ bgcolor: '#4A90E2', color: '#fff', display: 'block', py: 0.5, borderBottom: '1px solid #000' }} className="white-text">Destination Address</Typography>
-              <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
-              <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('destinationAddress')} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></Box>
+              <Box sx={{ p: 0.5, borderBottom: '1px solid #000' }}><TransparentInput {...register('companyName')} readOnly={true} inputProps={{ style: { textAlign: 'center', fontWeight: 600 } }} /></Box>
+              <Box sx={{ p: 0.5, flex: 1 }}><TransparentInput multiline {...register('destinationAddress')} readOnly={true} inputProps={{ style: { textAlign: 'center' } }} /></Box>
             </Box>
           </Box>
 
@@ -531,17 +518,17 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           }}>
             <thead>
               <tr>
-                <th style={{ width: '28px' }}>S/N</th>
+                <th style={{ width: '30px' }}>S/N</th>
                 <th style={{ width: '80px' }}>Indent No.</th>
-                <th style={{ width: '65px' }}>Product Code</th>
-                <th style={{ width: '85px' }}>Group</th>
+                <th style={{ width: '85px' }}>Product Code</th>
+                <th style={{ width: '100px' }}>Group</th>
                 <th>Product</th>
-                <th style={{ width: '45px' }}>Qty</th>
-                <th style={{ width: '40px' }}>Unit</th>
-                <th style={{ width: '50px' }}>Rate</th>
-                <th style={{ width: '50px' }}>Discount<br />%</th>
-                <th style={{ width: '35px' }}>GST %</th>
-                <th style={{ width: '65px' }}>Amount</th>
+                <th style={{ width: '50px' }}>Qty</th>
+                <th style={{ width: '50px' }}>Unit</th>
+                <th style={{ width: '60px' }}>Rate</th>
+                <th style={{ width: '55px' }}>Discount<br />%</th>
+                <th style={{ width: '45px' }}>GST %</th>
+                <th style={{ width: '80px' }}>Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -558,9 +545,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
                     <td style={{ textAlign: 'center', fontWeight: 600, color: '#1565c0' }}>
                       <TransparentInput {...register(`items.${idx}.indentNumber`)} readOnly inputProps={{ style: { textAlign: 'center', color: '#1565c0', fontWeight: 700 } }} />
                     </td>
-                    <td><TransparentInput {...register(`items.${idx}.itemCode`)} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></td>
-                    <td style={{ textAlign: 'left' }}><TransparentInput {...register(`items.${idx}.groupName`)} readOnly={isViewMode} /></td>
-                    <td style={{ textAlign: 'left' }}><TransparentInput {...register(`items.${idx}.description`)} readOnly={isViewMode} /></td>
+                    <td><TransparentInput {...register(`items.${idx}.itemCode`)} readOnly={true} inputProps={{ style: { textAlign: 'center' } }} /></td>
+                    <td style={{ textAlign: 'left' }}><TransparentInput {...register(`items.${idx}.groupName`)} readOnly={true} /></td>
+                    <td style={{ textAlign: 'left' }}><TransparentInput {...register(`items.${idx}.description`)} readOnly={true} /></td>
                     <td><TransparentInput type="number" {...register(`items.${idx}.quantity`)} readOnly={isViewMode} inputProps={{ step: 'any', style: { textAlign: 'center' } }} /></td>
                     <td><TransparentInput {...register(`items.${idx}.unit`)} readOnly={isViewMode} inputProps={{ style: { textAlign: 'center' } }} /></td>
                     <td><TransparentInput type="number" {...register(`items.${idx}.rate`)} readOnly={isViewMode} inputProps={{ step: 'any', style: { textAlign: 'center' } }} /></td>
@@ -596,13 +583,6 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             <Typography variant="caption" fontWeight={700} sx={{ display: 'block', p: 1, mt: 1 }}>
               Kindly Acknowledge Receipt Of This Purchase Order Along With Its Enclosures, And Ensure Timely Execution Of The Ordered Material.
             </Typography>
-          </Box>
-
-          {/* 6. Signatures */}
-          <Box sx={{ display: 'flex', bgcolor: '#4A90E2', color: '#fff', '& div': { flex: 1, py: 0.5, px: 2, fontSize: '0.65rem', fontWeight: 700 } }}>
-            <Box className="white-text" sx={{ textAlign: 'left' }}>Prepared By</Box>
-            <Box className="white-text" sx={{ textAlign: 'center' }}>Purchase Head</Box>
-            <Box className="white-text" sx={{ textAlign: 'right' }} />
           </Box>
 
         </Box>

@@ -24,7 +24,7 @@ const SectionLabel = ({ children }) => (
 export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }) {
   const dispatch = useDispatch();
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow, headers } = useData();
+  const { refresh, updateRow, headers, startSync, endSync } = useData();
   const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,6 +79,7 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     let biltyImageUrl = '';
     const folderId = import.meta.env.VITE_FOLDER_BILTY;
 
@@ -158,6 +159,7 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
       toast.error(err.message || "Failed to save logistics details to database.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 
