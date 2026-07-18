@@ -234,7 +234,11 @@ export default function IndentManagementPage() {
   const partyGroups = useMemo(() => {
     if (!partyName) return [];
     const groups = products
-      .filter(p => p.vendorName === partyName)
+      .filter(p => {
+        if (!p.vendorName) return false;
+        const list = String(p.vendorName).split(',').map(v => v.trim().toLowerCase());
+        return list.includes(String(partyName).trim().toLowerCase());
+      })
       .map(p => p.groupName);
     return [...new Set(groups)];
   }, [partyName, products]);
@@ -244,7 +248,11 @@ export default function IndentManagementPage() {
     setValue('filterGroup', '');
     if (!partyName) { replace([]); return; }
     const items = products
-      .filter(p => p.vendorName === partyName)
+      .filter(p => {
+        if (!p.vendorName) return false;
+        const list = String(p.vendorName).split(',').map(v => v.trim().toLowerCase());
+        return list.includes(String(partyName).trim().toLowerCase());
+      })
       .map(p => ({
         _productId: p.id,
         groupName: p.groupName,
