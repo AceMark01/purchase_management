@@ -50,7 +50,7 @@ const LIST_COLS = [
   { key: 'orderBy', label: 'Order By' },
   { key: 'partyName', label: 'Vendor', render: v => <Typography variant="body2" fontWeight={600}>{v}</Typography> },
   { key: 'groupName', label: 'Group Name' },
-  { key: 'itemName', label: 'Item Name', render: v => <Typography variant="body2" sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Typography> },
+  { key: 'itemName', label: 'Item Name', render: v => <Typography variant="body2">{v}</Typography> },
   { key: 'itemCode', label: 'Item Code' },
   { key: 'description', label: 'Description' },
   { key: 'quantity', label: 'Quantity' },
@@ -566,7 +566,7 @@ export default function IndentManagementPage() {
                         <TableRow key={item.id || index} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                           <TableCell sx={{ py: 1, px: 1.5, color: 'text.secondary', fontSize: '0.8rem', fontWeight: 600 }}>{index + 1}</TableCell>
                           <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.78rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>{item.groupName}</TableCell>
-                          <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.82rem', fontWeight: 500, maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.itemName}</TableCell>
+                          <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.82rem', fontWeight: 500 }}>{item.itemName}</TableCell>
                           <TableCell sx={{ py: 1, px: 1.5, fontSize: '0.78rem' }}>{item.unit}</TableCell>
                           <TableCell sx={{ py: 1, px: 1 }}><NumInput regProps={reg(`items.${index}.rate`)} defaultValue={item.rate} /></TableCell>
                           <TableCell sx={{ py: 1, px: 1 }}><NumInput regProps={reg(`items.${index}.gst`)} defaultValue={item.gst} /></TableCell>
