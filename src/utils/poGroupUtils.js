@@ -32,10 +32,10 @@ export const groupByPO = (records) => {
 
 // Columns used in all workflow stages AFTER the PO has been generated
 export const PO_COLUMNS = [
-  { key: 'poNumber',     label: 'PO Number',     minWidth: 190, render: (v) => v || '—' },
-  { key: 'poDate',       label: 'PO Date',        minWidth: 110, render: (v) => v || '—' },
-  { key: 'partyName',    label: 'Supplier',        minWidth: 180 },
-  { key: 'companyName',  label: 'Company',         minWidth: 160 },
+  { key: 'poNumber', label: 'PO Number', minWidth: 190, render: (v) => v || '—' },
+  { key: 'poDate', label: 'PO Date', minWidth: 110, render: (v) => v || '—' },
+  { key: 'partyName', label: 'Vendor', minWidth: 180 },
+  { key: 'companyName', label: 'Company', minWidth: 160 },
   {
     key: '_itemCount',
     label: 'Items',
@@ -52,6 +52,5 @@ export const PO_COLUMNS = [
         maximumFractionDigits: 2,
       })}`,
   },
-  { key: 'status',       label: 'Status',    type: 'status', minWidth: 120 },
-  { key: 'createdDate',  label: 'Date',               minWidth: 120, render: (v) => formatDate(v) },
+  { key: 'createdDate', label: 'Date', minWidth: 120, render: (v) => formatDate(v) },
 ];

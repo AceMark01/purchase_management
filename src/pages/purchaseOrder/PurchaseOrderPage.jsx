@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useData } from '../../contexts/DataContext';
 import { Box, Button, Chip, Link } from '@mui/material';
-import { ViewBtn, PrintBtn } from '../../components/common/ActionButtons';
+import { ViewBtn } from '../../components/common/ActionButtons';
 import DescriptionIcon from '@mui/icons-material/Description';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import GeneratePOForm from '../../components/po/GeneratePOForm';
@@ -12,7 +12,6 @@ import { WORKFLOW_COLUMNS } from '../../components/common/WorkflowTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs from '../../components/common/WorkflowTabs';
 import PageHeader from '../../components/common/PageHeader';
-import { printTable } from '../../utils/exportUtils';
 
 // Generates a fake PO number
 const generatePONumber = (indentNumber) => {
@@ -20,8 +19,31 @@ const generatePONumber = (indentNumber) => {
   return `PO-${new Date().getFullYear()}-${num}`;
 };
 
-// History columns includes PO Document link
-const getHistoryColumns = (onViewPDF) => [
+// Convert Google Drive download link to view link to force opening in a new tab
+const getGoogleDriveViewUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('drive.google.com/uc') || url.includes('docs.google.com/uc')) {
+    try {
+      const parsedUrl = new URL(url);
+      const id = parsedUrl.searchParams.get('id');
+      if (id) {
+        return `https://drive.google.com/file/d/${id}/view`;
+      }
+    } catch (e) {
+      const match = url.match(/[?&]id=([^&]+)/);
+      if (match && match[1]) {
+        return `https://drive.google.com/file/d/${match[1]}/view`;
+      }
+    }
+  }
+  if (url.includes('drive.google.com/file/d/')) {
+    return url.replace(/\/view\?usp=drivesdk/, '/view').replace(/\/view.*/, '/view').replace(/\/edit.*/, '/view');
+  }
+  return url;
+};
+
+// History columns includes PO Copy link
+const getHistoryColumns = () => [
   {
     key: 'poCopy',
     label: 'PO Copy',
@@ -29,7 +51,7 @@ const getHistoryColumns = (onViewPDF) => [
     render: (v, row) =>
       row.poCopy ? (
         <Link
-          href={row.poCopy}
+          href={getGoogleDriveViewUrl(row.poCopy)}
           target="_blank"
           rel="noopener noreferrer"
           sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}
@@ -41,25 +63,7 @@ const getHistoryColumns = (onViewPDF) => [
         <Chip label="N/A" size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
       ),
   },
-  {
-    key: 'poLink',
-    label: 'PO Document',
-    minWidth: 130,
-    render: (v, row) =>
-      row.poNumber ? (
-        <Link
-          component="button"
-          onClick={() => onViewPDF(row)}
-          underline="hover"
-          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}
-        >
-          View Form
-        </Link>
-      ) : (
-        <Chip label="N/A" size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
-      ),
-  },
-  ...WORKFLOW_COLUMNS.filter(col => col.key !== 'orderBy' && col.key !== 'leadDays' && col.key !== 'image'),
+  ...WORKFLOW_COLUMNS.filter(col => col.key !== 'orderBy' && col.key !== 'leadDays' && col.key !== 'image' && col.key !== 'status'),
 ];
 
 export default function PurchaseOrderPage() {
@@ -69,6 +73,7 @@ export default function PurchaseOrderPage() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [viewRecord, setViewRecord] = useState(null);
   const [selectedRowIds, setSelectedRowIds] = useState([]);
+  const [poFormMode, setPoFormMode] = useState('generate'); // 'generate' | 'view' | 'revise'
 
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
 
@@ -106,19 +111,29 @@ export default function PurchaseOrderPage() {
     const selectedRecs = pendingPoRecords.filter(r => selectedRowIds.includes(r.id));
     const uniqueParties = Array.from(new Set(selectedRecs.map(r => r.partyName)));
     if (uniqueParties.length > 1) {
-      toast.error('Please select indents belonging to the same Party/Supplier.');
+      toast.error('Please select indents belonging to the same Party/Vendor.');
       return;
     }
 
     setSelectedRow(null);
     setViewRecord(null);
+    setPoFormMode('generate');
     setGeneratePOOpen(true);
   };
 
-  const handleViewPDF = (row) => {
-    setViewRecord(row);
+  const handleOpenRevise = () => {
+    setSelectedRow(null);
+    setViewRecord(null);
+    setSelectedRowIds([]);
+    setPoFormMode('revise');
     setGeneratePOOpen(true);
   };
+
+  const handleViewPDF = useCallback((row) => {
+    setViewRecord(row);
+    setPoFormMode('view');
+    setGeneratePOOpen(true);
+  }, []);
 
   const actions = useCallback(
     (row) => {
@@ -126,15 +141,14 @@ export default function PurchaseOrderPage() {
         return []; // No row-level actions for pending, button is at top right
       } else {
         return [
-          <ViewBtn key="view" onClick={() => {}} />,
-          <PrintBtn key="print" onClick={() => printTable([row], WORKFLOW_COLUMNS.map((c) => ({ key: c.key, header: c.label })), `PO for ${row.indentNumber}`)} />,
+          <ViewBtn key="view" onClick={() => handleViewPDF(row)} />,
         ];
       }
     },
-    [tabValue]
+    [tabValue, handleViewPDF]
   );
 
-  const historyCols = useMemo(() => getHistoryColumns(handleViewPDF), []);
+  const historyCols = useMemo(() => getHistoryColumns(), []);
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -143,16 +157,26 @@ export default function PurchaseOrderPage() {
         subtitle={`${filtered.length} records found`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Purchase Order' }]}
         actions={
-          tabValue === 0 ? (
+          <Box display="flex" gap={1}>
+            {tabValue === 0 && (
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<DescriptionIcon />}
+                onClick={handleOpenGenerate}
+              >
+                Generate PO
+              </Button>
+            )}
             <Button
               variant="contained"
-              color="secondary"
+              color="primary"
               startIcon={<DescriptionIcon />}
-              onClick={handleOpenGenerate}
+              onClick={handleOpenRevise}
             >
-              Generate PO
+              Revise PO
             </Button>
-          ) : null
+          </Box>
         }
       />
 
@@ -161,7 +185,7 @@ export default function PurchaseOrderPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : WORKFLOW_COLUMNS}
+        columns={tabValue === 1 ? historyCols : WORKFLOW_COLUMNS.filter(c => c.key !== 'status')}
         rows={filtered}
         title={tabValue === 0 ? 'Pending PO Generation' : 'PO Generation History'}
         searchKey={['indentNumber', 'partyName', 'itemName', 'companyName']}
@@ -185,6 +209,7 @@ export default function PurchaseOrderPage() {
             setViewRecord(null);
           }}
           viewRecord={viewRecord}
+          mode={poFormMode}
         />
       )}
     </Box>

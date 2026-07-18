@@ -6,11 +6,12 @@ const AuthContext = createContext(null);
 const ADMIN_PAGES = [
   'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
   'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
-  'settings',
+  'whatsapp', 'settings',
 ];
 const USER_PAGES = [
   'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
   'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
+  'whatsapp',
 ];
 
 

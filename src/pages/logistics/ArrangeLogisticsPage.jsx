@@ -3,7 +3,6 @@ import { useSelector }                     from 'react-redux';
 import { Box, Button, Link, Chip }         from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import OpenInNewIcon     from '@mui/icons-material/OpenInNew';
-import { ViewBtn }       from '../../components/common/ActionButtons';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -95,8 +94,8 @@ export default function ArrangeLogisticsPage() {
   }), []);
 
   const pendingCols = useMemo(() => {
-    return [indentCol, serialCol, ...PO_COLUMNS];
-  }, [indentCol, serialCol]);
+    return [indentCol, serialCol, ...getHistoryCols(handleViewPO)];
+  }, [handleViewPO, indentCol, serialCol]);
 
   const historyCols = useMemo(() => {
     return [indentCol, liftCol, ...getHistoryCols(handleViewPO)];
@@ -113,7 +112,7 @@ export default function ArrangeLogisticsPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -133,6 +132,7 @@ export default function ArrangeLogisticsPage() {
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {logisticsOpen && (

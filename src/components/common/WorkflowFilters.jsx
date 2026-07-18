@@ -92,8 +92,8 @@ export default function WorkflowFilters({ appliedFilters, onApply, onReset }) {
         sx={{ ...INPUT_SX }}
       />
 
-      {/* Supplier */}
-      <TextField size="small" label="Supplier"
+      {/* Vendor */}
+      <TextField size="small" label="Vendor"
         value={filters.partyName} onChange={fi('partyName')}
         sx={{ ...INPUT_SX }}
       />

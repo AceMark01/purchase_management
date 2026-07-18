@@ -6,7 +6,7 @@ export const WORKFLOW_COLUMNS = [
   { key: 'indentNumber', label: 'Indent Number', minWidth: 150 },
   { key: 'serialNo', label: 'Serial No.', minWidth: 100 },
   { key: 'orderBy', label: 'Order By', minWidth: 150 },
-  { key: 'partyName', label: 'Party Name', minWidth: 180 },
+  { key: 'partyName', label: 'Vendor', minWidth: 180 },
   { key: 'groupName', label: 'Group Name', minWidth: 150 },
   { key: 'itemName', label: 'Item Name', minWidth: 180 },
   { key: 'itemCode', label: 'Item Code', minWidth: 120 },

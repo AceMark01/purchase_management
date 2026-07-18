@@ -50,13 +50,16 @@ export function mapProductRow(row, idx) {
     id: idx + 1,
     _row: row._row || (idx + 2),
     productType: row["Product Type"] || "",
-    vendorId: row["Vendor-ID"] || "",
-    vendorName: row["Vendor Name"] || "",
+    vendorId: row["Supplier ID"] || "", // backward compatibility
+    vendorName: row["Supplier Name"] || "", // backward compatibility
+    supplierId: row["Supplier ID"] || "",
+    supplierName: row["Supplier Name"] || "",
     groupName: row["Group Name"] || "",
     itemName: row["Item Name"] || "",
     unit: row["Unit"] || "",
     itemCode: row["Item Code"] || "",
     purchaseRate: parseNum(row["Purchase Rate"]),
+    mobileNo: row["Mobile NO"] || "",
   };
 }
 
@@ -78,13 +81,13 @@ export function mapVendorRow(row, idx) {
   return {
     id: idx + 1,
     _row: row._row || (idx + 2),
-    vendorId: row["Vendor-ID"] || "",
-    vendorName: row["Vendor Name"] || "",
-    contactPerson: row["Contact Person Name"] || "",
+    vendorName: row["Vendor Name"] || "",         // backward compat
+    vendorId:   row["Vendor Name"] || "",          // backward compat alias
+    city:       row["City"] || "",
+    gstNumber:  row["GST Number"] || "",
+    address:    row["Address"] || "",
     phoneNumber: row["Phone Number"] || "",
-    email: row["Email Address"] || "",
-    gstNumber: row["GST Number"] || "",
-    vendorLocation: row["Vendor Location"] || "",
+    transportName: row["Transport Name"] || "",
   };
 }
 
@@ -105,6 +108,28 @@ export function mapUserRow(row, idx) {
 
 
 
+const formatToStandardDateTime = (d) => {
+  if (!d) return '';
+  const str = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(str)) {
+    return str;
+  }
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return str;
+    const pad = (num) => String(num).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    const ss = pad(date.getSeconds());
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+  } catch {
+    return str;
+  }
+};
+
 /**
  * Maps WhatsApp Form rows
  */
@@ -112,7 +137,7 @@ export function mapWhatsAppRow(row, idx) {
   return {
     id: idx + 1,
     _row: row._row || (idx + 2),
-    timestamp: row["Timestamp"] || "",
+    timestamp: formatToStandardDateTime(row["Timestamp"]),
     partyName: row["Party Name"] || "",
     slipImage: row["Slip Image"] || "",
     orderBy: row["Order By"] || "",
@@ -443,6 +468,7 @@ export function mapWorkflowRecords(
     if (receive) {
       baseRecord.workflowStage.receiveMaterial = 'Completed';
       baseRecord._receivingRow = receive._row;
+      baseRecord.liftNo = receive["Lift No."] || receive["Lift No. "] || baseRecord.liftNo || "";
 
       const liftStatus = receive["lift Status"] || receive["Status"];
       const accountsStatus = receive["Status"];
@@ -548,7 +574,7 @@ export function mapWorkflowRecords(
       rec.poDetails = {
         poNumber: rec.poNumber,
         poDate: rec.poDate,
-        supplierId: String(vendor.vendorId || ""),
+        vendorId: String(vendor.vendorId || ""),
         vendorName: rec.partyName,
         vendorGst: vendor.gstNumber || "",
         vendorAddress: vendor.vendorLocation || "",
@@ -561,7 +587,7 @@ export function mapWorkflowRecords(
         priceBasis: 'F.O.R. Destination',
         taxesDuties: 'GST Extra as applicable',
         delivery: 'Within 2-3 Weeks from PO date',
-        transport: 'By Supplier',
+        transport: 'By Vendor',
         paymentTerms: '30 Days credit',
         dispatchDate: rec.expectedArrivalDate || "",
         items: group.map((item, idx) => ({

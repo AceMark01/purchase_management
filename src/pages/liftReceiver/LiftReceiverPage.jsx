@@ -3,7 +3,6 @@ import { useSelector }                     from 'react-redux';
 import { Box, Button, Link }               from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon   from '@mui/icons-material/OpenInNew';
-import { ViewBtn }     from '../../components/common/ActionButtons';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -40,6 +39,21 @@ const getHistoryCols = (onViewPO) => [
     ) : '—',
   },
   { key: 'liftRemarks', label: 'Remarks', minWidth: 180 },
+];
+
+const getPendingCols = (onViewPO) => [
+  ...PO_COLUMNS,
+  {
+    key: 'poViewLink',
+    label: 'PO Document',
+    minWidth: 120,
+    render: (_v, row) => row.poNumber ? (
+      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+      </Link>
+    ) : '—',
+  },
 ];
 
 export default function LiftReceiverPage() {
@@ -80,6 +94,7 @@ export default function LiftReceiverPage() {
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
   const historyCols  = useMemo(() => getHistoryCols(handleViewPO), []);
+  const pendingCols  = useMemo(() => getPendingCols(handleViewPO), []);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {
@@ -92,7 +107,7 @@ export default function LiftReceiverPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -106,12 +121,13 @@ export default function LiftReceiverPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : PO_COLUMNS}
+        columns={tabValue === 1 ? historyCols : pendingCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending Receiver' : 'Receiver History'}
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {receiverOpen && (

@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import SendIcon      from '@mui/icons-material/Send';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { ViewBtn }   from '../../components/common/ActionButtons';
 import { toast }     from 'react-toastify';
 import { useData } from '../../contexts/DataContext';
 import { formatTimestamp } from '../../utils/formatters';
@@ -123,7 +122,7 @@ export default function SendPOToPartyPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -137,12 +136,13 @@ export default function SendPOToPartyPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : PO_COLUMNS}
+        columns={historyCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending Send' : 'Sent History'}
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {/* Send Dialog */}

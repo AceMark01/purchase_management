@@ -80,11 +80,11 @@ const SHEET_MAP = {
   "followUps": "Flw-up",
   "logistics": "LIFT-RECEIVED",
   "receiving": "RECEIVED-ACCOUNTS",
-  "products": "Master-Products",
+  "products": "Product Master",
   "companies": "Master-Company",
-  "vendors": "Master-Vendors",
+  "vendors": "CReditor MAster",
   "users": "LOGIN",
-  "whatsapp": "Whatsapp Form",
+  "whatsapp": "Whatsapp-Orders",
   "poSentStatus": "PO Sent Status",
   "poGenerate": "Po Generate",
   "poHistory": "PO-History"
@@ -225,22 +225,26 @@ export function DataProvider({ children }) {
       if (sheetsToFetch && sheetsToFetch.length > 0) {
         const activeSheets = [
           { key: "indents", name: "INDENT-PO" },
-          { key: "whatsapp", name: "Whatsapp Form" },
+          { key: "whatsapp", name: "Whatsapp-Orders" },
           { key: "followUps", name: "Flw-up" },
           { key: "poGenerate", name: "Po Generate" },
           { key: "poHistory", name: "PO-History" },
           { key: "logistics", name: "LIFT-RECEIVED" },
           { key: "receiving", name: "RECEIVED-ACCOUNTS" },
           { key: "users", name: "LOGIN" },
-          { key: "vendorsData", name: "Master-Vendors" },
-          { key: "productsData", name: "Master-Products" },
+          { key: "vendorsData", name: "CReditor MAster" },
+          { key: "productsData", name: "Product Master" },
           { key: "dropdowns", name: "Dropdown" },
           { key: "companiesData", name: "Master-Company" }
         ];
 
         const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
         const promises = targets.map(async (s) => {
-          const res = await gasApi.fetchSheet(s.name);
+          const res = s.key === "productsData"
+            ? await gasApi.fetchProductSheet(s.name)
+            : s.key === "vendorsData"
+              ? await gasApi.fetchVendorSheet(s.name)
+              : await gasApi.fetchSheet(s.name);
           return { key: s.key, data: res.data || [] };
         });
         const results = await Promise.all(promises);
@@ -248,8 +252,20 @@ export function DataProvider({ children }) {
           fetchedData[r.key] = r.data;
         }
       } else {
-        const result = await gasApi.bootstrap();
+        const [result, prodResult, vendorResult] = await Promise.all([
+          gasApi.bootstrap(),
+          gasApi.fetchProductSheet("Product Master").catch(err => {
+            console.error("Failed to fetch products from new GAS URL", err);
+            return { data: [] };
+          }),
+          gasApi.fetchVendorSheet("CReditor MAster").catch(err => {
+            console.error("Failed to fetch vendors from new GAS URL", err);
+            return { data: [] };
+          })
+        ]);
         fetchedData = result.data || {};
+        fetchedData.productsData = prodResult.data || [];
+        fetchedData.vendorsData = vendorResult.data || [];
       }
 
       const indentsRaw = fetchedData.indents !== undefined ? fetchedData.indents : rawIndents;
@@ -317,12 +333,32 @@ export function DataProvider({ children }) {
         return obj;
       };
 
-      // Products: from "Master-Products" sheet, columns A-H (0-7), header row = 1
-      const productHeaders = (productsDataRaw[0] || []).map(h => String(h || "").trim());
-      const productsObj = productsDataRaw.slice(1).map((row, idx) => ({
-        _row: idx + 2,
-        ...sliceRowToObj(row, productHeaders, 0)
-      })).filter(r => r["Product Type"] && String(r["Product Type"]).trim() !== "");
+      // Products: from "Product Master" sheet, using exact column mapping:
+      // Product Type(G=index 6), Supplier ID(J=index 9), Supplier Name(K=index 10), Group Name(F=index 5), Item Name(C=index 2), Unit(J=index 9), Item Code(D=index 3), Purchase Rate(M=index 12), Mobile NO(P=index 15)
+      const productHeaders = [];
+      productHeaders[6] = "Product Type";
+      productHeaders[9] = "Supplier ID";
+      productHeaders[10] = "Supplier Name";
+      productHeaders[5] = "Group Name";
+      productHeaders[2] = "Item Name";
+      productHeaders[3] = "Item Code";
+      productHeaders[12] = "Purchase Rate";
+      productHeaders[15] = "Mobile NO";
+
+      const productsObj = productsDataRaw.slice(1).map((row, idx) => {
+        return {
+          _row: idx + 2,
+          "Product Type": row[6] || "",
+          "Supplier ID": row[9] || "",
+          "Supplier Name": row[10] || "",
+          "Group Name": row[5] || "",
+          "Item Name": row[2] || "",
+          "Unit": row[9] || "",
+          "Item Code": row[3] || "",
+          "Purchase Rate": row[12] || "",
+          "Mobile NO": row[15] || ""
+        };
+      }).filter(r => r["Product Type"] && String(r["Product Type"]).trim() !== "");
       const mappedProducts = productsObj.map((row, idx) => mapProductRow(row, idx));
 
       // Dropdowns: from "Dropdown" sheet, header row = 1
@@ -343,12 +379,28 @@ export function DataProvider({ children }) {
       })).filter(r => r["Company Name"] && String(r["Company Name"]).trim() !== "");
       const mappedCompanies = companiesObj.map((row, idx) => mapCompanyRow(row, idx));
 
-      // Vendors: from "Master-Vendors" sheet, header row = 1, columns A-G
-      const vendorHeaders = (vendorsDataRaw[0] || []).map(h => String(h || "").trim());
-      const vendorsObj = vendorsDataRaw.slice(1).map((row, idx) => ({
-        _row: idx + 2,
-        ...sliceRowToObj(row, vendorHeaders, 0)
-      })).filter(r => r["Vendor Name"] && String(r["Vendor Name"]).trim() !== "");
+      // Vendors: from "CReditor MAster" sheet, using index-based mapping
+      // VENDOR NAME(C=2), CITY(D=3), GST NUMBER(E=4), ADDRESS(G=6, H=7, I=8), PHONE NUMBER(K=10), TRANSPORT NAME(L=11)
+      const vendorHeaders = [];
+      vendorHeaders[2] = "Vendor Name";
+      vendorHeaders[3] = "City";
+      vendorHeaders[4] = "GST Number";
+      vendorHeaders[6] = "Address";
+      vendorHeaders[10] = "Phone Number";
+      vendorHeaders[11] = "Transport Name";
+
+      const vendorsObj = vendorsDataRaw.slice(1).map((row, idx) => {
+        const addressParts = [row[6], row[7], row[8]].map(p => String(p || '').trim()).filter(Boolean);
+        return {
+          _row: idx + 2,
+          "Vendor Name": row[2] || "",
+          "City": row[3] || "",
+          "GST Number": row[4] || "",
+          "Address": addressParts.join(", "),
+          "Phone Number": row[10] || "",
+          "Transport Name": row[11] || ""
+        };
+      }).filter(r => r["Vendor Name"] && String(r["Vendor Name"]).trim() !== "");
       const mappedVendors = vendorsObj.map((row, idx) => mapVendorRow(row, idx));
 
       // Users: LOGIN sheet, header row = 1
@@ -542,11 +594,19 @@ export function DataProvider({ children }) {
   }, [user]);
 
   const refresh = async (sheetsToFetch = null, showSpinner = true) => {
-    if (showSpinner) setWriteLoading(true);
+    if (showSpinner) {
+      setWriteLoading(true);
+    } else {
+      startSync();
+    }
     try {
       await loadData(false, sheetsToFetch);
     } finally {
-      if (showSpinner) setWriteLoading(false);
+      if (showSpinner) {
+        setWriteLoading(false);
+      } else {
+        endSync();
+      }
     }
   };
 
@@ -646,7 +706,11 @@ export function DataProvider({ children }) {
         }
       }
       if (cells.length > 0) {
-        await gasApi.updateCells(sheetName, cells);
+        if (resource === "products") {
+          await gasApi.updateProductCells(sheetName, cells);
+        } else {
+          await gasApi.updateCells(sheetName, cells);
+        }
       }
     } finally {
       if (showSpinner) setWriteLoading(false);
@@ -655,8 +719,31 @@ export function DataProvider({ children }) {
 
   const addRow = async (resource, data, showSpinner = true) => {
     const sheetName = SHEET_MAP[resource];
-    const headers = headersState[resource] || [];
+    const headers = headersState[resource]?.length 
+      ? headersState[resource] 
+      : (resource === 'whatsapp' ? ["Timestamp", "Party Name", "Slip Image", "Order By", "Email Address"] : []);
     const rowValues = [];
+    
+    if (resource === 'whatsapp') {
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i];
+        if (header === "Timestamp") {
+          rowValues.push("'" + formatTimestamp(data.Timestamp || data.timestamp || new Date()));
+        } else if (data[header] !== undefined) {
+          rowValues.push(data[header]);
+        } else {
+          rowValues.push("");
+        }
+      }
+      if (showSpinner) setWriteLoading(true);
+      try {
+        const res = await gasApi.insertInColumns(sheetName, 1, rowValues, 1);
+        return res;
+      } finally {
+        if (showSpinner) setWriteLoading(false);
+      }
+    }
+
     // Skip Column A (headers[0]) because backend.js's insert action automatically prepends uniqueId to Column A.
     for (let i = 1; i < headers.length; i++) {
       const header = headers[i];

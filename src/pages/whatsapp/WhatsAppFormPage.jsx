@@ -32,7 +32,7 @@ const INPUT_SX = {
 
 const WA_COLS = [
   { key: 'timestamp', label: 'Timestamp' },
-  { key: 'partyName', label: 'Party Name' },
+  { key: 'partyName', label: 'Vendor' },
   { key: 'slipImage', label: 'Slip Image' },
   { key: 'orderBy', label: 'Order By' },
   { key: 'email', label: 'Email Address' },
@@ -43,7 +43,7 @@ export default function WhatsAppFormPage() {
   const isDark = theme.palette.mode === 'dark';
   const slipRef = useRef(null);
 
-  const { whatsappEntries: entries, refresh, addRow } = useData();
+  const { whatsappEntries: entries, refresh, addRow, orderByList } = useData();
   const vendors = useSelector((s) => s.vendorMaster.items) || [];
 
   const [slipFile, setSlipFile] = useState(null);
@@ -70,10 +70,10 @@ export default function WhatsAppFormPage() {
   });
 
   const onSave = async (data) => {
-    if (!data.partyName) { toast.error('Party Name is required'); return; }
+    if (!data.partyName) { toast.error('Vendor is required'); return; }
     setIsSubmitting(true);
     let fileUrl = '';
-    const folderId = import.meta.env.VITE_GOOGLE_FOLDER_INDENT;
+    const folderId = import.meta.env.VITE_FOLDER_WHATSAPP;
 
     if (slipFile && folderId) {
       try {
@@ -95,7 +95,7 @@ export default function WhatsAppFormPage() {
 
     try {
       const payload = {
-        "timestamp": formatTimestamp(data.timestamp),
+        "Timestamp": formatTimestamp(new Date()),
         "Party Name": data.partyName,
         "Slip Image": fileUrl || (slipFile ? slipFile.name : ''),
         "Order By": data.orderBy || '',
@@ -107,7 +107,7 @@ export default function WhatsAppFormPage() {
         toast.success('WhatsApp order entry saved!');
         await refresh(['whatsapp'], false);
         reset({
-          timestamp: formatTimestamp().slice(0, 16),
+          timestamp: new Date().toISOString().slice(0, 16),
           partyName: '', orderBy: '', email: '',
         });
         setSlipFile(null);
@@ -126,7 +126,7 @@ export default function WhatsAppFormPage() {
     if (!target) return;
     try {
       setIsSubmitting(true);
-      const result = await gasApi.removeResource('whatsapp', target.timestamp);
+      const result = await gasApi.deleteRow('Whatsapp-Orders', target._row);
       if (result.success) {
         toast.info('Entry removed');
         await refresh(['whatsapp'], false);
@@ -200,17 +200,18 @@ export default function WhatsAppFormPage() {
                   {...register('timestamp')}
                   fullWidth size="small" type="datetime-local"
                   InputLabelProps={{ shrink: true }} sx={INPUT_SX}
+                  InputProps={{ readOnly: true }}
                 />
               </Grid>
 
-              {/* Party Name */}
+              {/* Vendor */}
               <Grid item xs={12} sm={6} md={2.5}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                  Party Name <span style={{ color: '#ef4444' }}>*</span>
+                  Vendor <span style={{ color: '#ef4444' }}>*</span>
                 </Typography>
                 <Controller name="partyName" control={control} render={({ field }) => (
                   <TextField {...field} select fullWidth size="small" sx={INPUT_SX}>
-                    <MenuItem value=""><em>— Select Party —</em></MenuItem>
+                    <MenuItem value=""><em>— Select Vendor —</em></MenuItem>
                     {vendors.map(v => <MenuItem key={v.id} value={v.vendorName}>{v.vendorName}</MenuItem>)}
                   </TextField>
                 )} />
@@ -246,7 +247,7 @@ export default function WhatsAppFormPage() {
                 <Controller name="orderBy" control={control} render={({ field }) => (
                   <TextField {...field} select fullWidth size="small" sx={INPUT_SX}>
                     <MenuItem value=""><em>— Select —</em></MenuItem>
-                    {ORDER_BY_LIST.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+                    {orderByList.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
                   </TextField>
                 )} />
               </Grid>
@@ -311,15 +312,6 @@ export default function WhatsAppFormPage() {
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: 'text.disabled' }} /></InputAdornment> }}
             sx={{ minWidth: 220, '& .MuiOutlinedInput-root': { height: 34, fontSize: '0.875rem', borderRadius: 1.5 } }}
           />
-          <Tooltip title="Export Excel" arrow>
-            <IconButton
-              size="small"
-              onClick={() => exportToExcel(filtered, exportCols, 'WhatsApp Orders')}
-              sx={{ border: 1, borderColor: 'divider', color: '#059669', borderRadius: 1.5 }}
-            >
-              <FileDownloadIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
         </Box>
 
         {/* Table */}
@@ -380,7 +372,7 @@ export default function WhatsAppFormPage() {
                     {entry.timestamp}
                   </TableCell>
 
-                  {/* Party Name */}
+                  {/* Vendor */}
                   <TableCell sx={{ py: 1.2, px: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#25d366', flexShrink: 0 }} />

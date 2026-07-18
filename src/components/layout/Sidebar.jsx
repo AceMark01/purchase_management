@@ -25,6 +25,7 @@ import FactCheckIcon        from '@mui/icons-material/FactCheck';
 import SendIcon             from '@mui/icons-material/Send';
 import VerifiedIcon         from '@mui/icons-material/Verified';
 import { useAuth } from '../../contexts/AuthContext';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 export const DRAWER_WIDTH = 264;
 
@@ -33,6 +34,7 @@ const NAV_SECTIONS = [
     key: 'main',
     items: [
       { label: 'Dashboard', icon: DashboardIcon, path: '/dashboard', page: 'dashboard' },
+      { label: 'WhatsApp Form', icon: WhatsAppIcon, path: '/whatsapp', page: 'whatsapp' },
     ],
   },
   {

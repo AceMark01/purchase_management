@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import {
   Dialog, DialogContent, Box, Typography, TextField, MenuItem, Button, IconButton, Stack
@@ -18,19 +17,40 @@ import { generatePoPdfBlob } from './pdf-generate';
 const generatePONumber = () => `ACE/PO/25-26-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
 // Transparent input used inside the printable PO template
-const TransparentInput = ({ readOnly, ...props }) => (
+const TransparentInput = ({ readOnly, inputProps = {}, ...props }) => (
   <TextField
+    disabled={readOnly}
     variant="standard"
     fullWidth
     InputProps={{
       disableUnderline: true,
       readOnly: readOnly || false,
-      style: { fontSize: '0.7rem', fontWeight: 600, padding: 0, cursor: readOnly ? 'default' : 'text', color: '#000' }
+      style: {
+        fontSize: '0.7rem',
+        fontWeight: 600,
+        padding: 0,
+        cursor: readOnly ? 'default' : 'text',
+        color: '#000',
+        pointerEvents: readOnly ? 'none' : 'auto'
+      }
+    }}
+    inputProps={{
+      readOnly: readOnly || false,
+      ...inputProps,
+      style: {
+        textAlign: inputProps?.style?.textAlign || 'left',
+        cursor: readOnly ? 'default' : 'text',
+        ...inputProps?.style
+      }
     }}
     sx={{
       '& .MuiInputBase-input': {
         padding: 0,
         height: 'auto',
+        color: '#000 !important',
+        WebkitTextFillColor: '#000 !important'
+      },
+      '& .MuiInputBase-input.Mui-disabled': {
         color: '#000 !important',
         WebkitTextFillColor: '#000 !important'
       }
@@ -39,19 +59,28 @@ const TransparentInput = ({ readOnly, ...props }) => (
   />
 );
 
-export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowIds = [] }) {
-  const dispatch = useDispatch();
+export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowIds = [], mode = 'generate' }) {
   const [submitting, setSubmitting] = useState(false);
-  const vendors = useSelector((state) => state.vendorMaster.items) || [];
-  const companies = useSelector((state) => state.companies.items) || [];
-  const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [], startSync, endSync } = useData();
+  const { refresh, updateRow, pendingPoRecords = [], poHistoryRecords = [], startSync, endSync, vendors = [], companies = [] } = useData();
+
+  const isViewMode = mode === 'view' || !!viewRecord;
+  const isReviseMode = mode === 'revise';
+
+  const uniquePoNumbers = useMemo(() => {
+    const numbers = new Set();
+    poHistoryRecords.forEach(r => {
+      if (r.poNumber) {
+        numbers.add(r.poNumber);
+      }
+    });
+    return Array.from(numbers).sort();
+  }, [poHistoryRecords]);
 
   const { control, register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
-      poNumber: generatePONumber(),
+      poNumber: mode === 'revise' ? '' : generatePONumber(),
       poDate: new Date().toISOString().slice(0, 10),
-      supplierId: '',
+      vendorId: '',
       vendorName: '',
       vendorGst: '',
       vendorAddress: '',
@@ -65,29 +94,73 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       priceBasis: 'F.O.R. Destination',
       taxesDuties: 'GST Extra as applicable',
       delivery: 'Within 2-3 Weeks from PO date',
-      transport: 'By Supplier',
+      transport: 'By Vendor',
       paymentTerms: '30 Days credit',
       dispatchDate: '',
     }
   });
 
-  const isViewMode = !!viewRecord;
-
-  // Auto-select supplier if selectedRowIds are passed from parent
+  // Auto-select vendor if selectedRowIds are passed from parent
   useEffect(() => {
-    if (isViewMode) return;
+    if (isViewMode || isReviseMode) return;
     if (selectedRowIds && selectedRowIds.length > 0 && vendors.length > 0 && pendingPoRecords.length > 0) {
       const firstRec = pendingPoRecords.find(r => r.id === selectedRowIds[0]);
       if (firstRec) {
         const ven = vendors.find(v => v.vendorName === firstRec.partyName);
         if (ven) {
-          setValue('supplierId', ven.vendorId);
+          setValue('vendorId', ven.vendorId);
         }
       }
     }
-  }, [selectedRowIds, vendors, pendingPoRecords, isViewMode, setValue]);
+  }, [selectedRowIds, vendors, pendingPoRecords, isViewMode, isReviseMode, setValue]);
 
   const { replace } = useFieldArray({ control, name: 'items' });
+
+  const selectedPoNumber = watch('poNumber');
+  
+  useEffect(() => {
+    if (!isReviseMode || !selectedPoNumber) return;
+    
+    // Find all rows in poHistoryRecords that belong to this PO
+    const poGroup = poHistoryRecords.filter(r => r.poNumber && r.poNumber.toLowerCase() === selectedPoNumber.toLowerCase());
+    if (poGroup.length === 0) return;
+    
+    const firstRec = poGroup[0];
+    
+    setValue('poDate', firstRec.timestamp ? new Date(firstRec.timestamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setValue('vendorName', firstRec.partyName || '');
+    setValue('companyName', firstRec.companyName || '');
+    
+    const ven = vendors.find(v => v.vendorName === firstRec.partyName);
+    if (ven) {
+      setValue('vendorId', ven.vendorId);
+      setValue('vendorGst', ven.gstNumber || '');
+      setValue('vendorAddress', ven.vendorLocation || 'Not available');
+    }
+    
+    const comp = companies.find(c => c.companyName === firstRec.companyName);
+    if (comp) {
+      setValue('companyId', comp.id);
+      setValue('companyGst', comp.gstNumber || '');
+      setValue('companyPan', comp.panNumber || '');
+      setValue('billingAddress', comp.billingAddress || '');
+      setValue('destinationAddress', comp.destination || '');
+    }
+    
+    replace(poGroup.map((item, idx) => ({
+      _row: item._row,
+      sno: idx + 1,
+      indentNumber: item.indentNumber || '',
+      itemCode: item.itemCode || '',
+      groupName: item.groupName || '',
+      description: item.itemName || '',
+      quantity: item.quantity || 0,
+      unit: item.unit || '',
+      rate: item.rate || 0,
+      discount: item.discount || 0,
+      gst: item.gst || 0,
+    })));
+  }, [selectedPoNumber, isReviseMode, poHistoryRecords, setValue, replace, vendors, companies]);
 
   // Only show vendors that have at least one pending purchaseOrder indent
   const pendingPartyNames = useMemo(() => {
@@ -117,7 +190,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId', ven.vendorId);
+        setValue('vendorId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
@@ -152,7 +225,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const ven = vendors.find(v => v.vendorName === viewRecord.partyName);
       if (ven) {
-        setValue('supplierId', ven.vendorId);
+        setValue('vendorId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
         setValue('vendorAddress', ven.vendorLocation || 'Not available');
       }
@@ -181,20 +254,20 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     }
   }, [isViewMode, viewRecord, setValue, replace, vendors, companies, poHistoryRecords]);
 
-  // ── Auto-batch pending indents when supplier is selected (edit mode) ───
-  const selectedSupplierId = watch('supplierId');
+  // ── Auto-batch pending indents when vendor is selected (edit mode) ───
+  const selectedVendorId = watch('vendorId');
   useEffect(() => {
-    if (isViewMode) return;
-    if (!selectedSupplierId || !vendors.length) { replace([]); return; }
+    if (isViewMode || isReviseMode) return;
+    if (!selectedVendorId || !vendors.length) { replace([]); return; }
 
-    const ven = vendors.find(v => v.vendorId === selectedSupplierId);
+    const ven = vendors.find(v => v.vendorId === selectedVendorId);
     if (!ven) return;
 
     setValue('vendorName', ven.vendorName || '');
     setValue('vendorGst', ven.gstNumber || '');
     setValue('vendorAddress', ven.vendorLocation || 'Not available');
 
-    // Batch pending indents for this supplier (filter by selectedRowIds if provided)
+    // Batch pending indents for this vendor (filter by selectedRowIds if provided)
     const matchedIndents = pendingPoRecords.filter(
       r => r.partyName === ven.vendorName &&
         (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
@@ -232,7 +305,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       discount: ind.discount || 0,
       gst: ind.gst || 0,
     })));
-  }, [selectedSupplierId, vendors, pendingPoRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
+  }, [selectedVendorId, vendors, pendingPoRecords, companies, setValue, replace, isViewMode, selectedRowIds]);
 
   // ── Running totals ────────────────────────────────────────────────────
   const watchItems = useWatch({ control, name: 'items' });
@@ -274,18 +347,21 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
   // ── Save & Submit ─────────────────────────────────────────────────────
   const onSubmit = async () => {
     if (isViewMode || submitting) return;
-    setSubmitting(true);
 
     const data = watch();
-    if (!data.supplierId) { toast.error('Please select a supplier first.'); return; }
+    if (isReviseMode) {
+      if (!data.poNumber) { toast.error('Please select a PO Number first.'); return; }
+      if (!data.items || data.items.length === 0) { toast.error('No items found in selected PO.'); return; }
+    } else {
+      if (!data.vendorId) { toast.error('Please select a vendor first.'); return; }
+      const matchedIndents = pendingPoRecords.filter(
+        r => r.partyName === data.vendorName &&
+          (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
+      );
+      if (matchedIndents.length === 0) { toast.error('No pending indents to process.'); return; }
+    }
 
-    const matchedIndents = pendingPoRecords.filter(
-      r => r.partyName === data.vendorName &&
-        (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
-    );
-
-    if (matchedIndents.length === 0) { toast.error('No pending indents to process.'); return; }
-
+    setSubmitting(true);
     if (startSync) startSync();
 
     try {
@@ -314,55 +390,103 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       const fileUrl = uploadResponse.fileUrl;
 
-      // 1. Submit the new PO records to PO-History (Columns A-R)
-      const historyRows = [];
-      for (const indent of matchedIndents) {
-        const matchedFormItem = data.items?.find(
-          it => it.indentNumber === indent.indentNumber &&
-            it.itemCode === indent.itemCode
+      if (isReviseMode) {
+        // Prepare cell updates for PO-History sheet
+        const cells = [];
+        for (const item of data.items) {
+          if (!item._row) continue;
+          const poQty = parseFloat(item.quantity) || 0;
+          const poRate = parseFloat(item.rate) || 0;
+          const poDiscount = parseFloat(item.discount) || 0;
+          const poGst = parseFloat(item.gst) || 0;
+
+          const afterDiscount = poQty * poRate * (1 - poDiscount / 100);
+          const discounted = afterDiscount;
+          const total = afterDiscount * (1 + poGst / 100);
+
+          // Update Columns:
+          // Column I (9): Quntity
+          // Column K (11): Rate
+          // Column L (12): Discount%
+          // Column M (13): Gst %
+          // Column N (14): Amount
+          // Column O (15): Total Amount
+          // Column P (16): PO Copy
+          cells.push({ rowIndex: item._row, columnIndex: 9, value: poQty });
+          cells.push({ rowIndex: item._row, columnIndex: 11, value: poRate });
+          cells.push({ rowIndex: item._row, columnIndex: 12, value: poDiscount });
+          cells.push({ rowIndex: item._row, columnIndex: 13, value: poGst });
+          cells.push({ rowIndex: item._row, columnIndex: 14, value: discounted });
+          cells.push({ rowIndex: item._row, columnIndex: 15, value: total });
+          cells.push({ rowIndex: item._row, columnIndex: 16, value: fileUrl });
+        }
+
+        if (cells.length > 0) {
+          await gasApi.updateCells("PO-History", cells);
+        }
+
+        toast.success(`Purchase Order ${data.poNumber} revised successfully and saved to Drive!`);
+        onClose();
+        refresh(['poHistory'], false)
+          .catch(err => console.error("Background refresh failed:", err))
+          .finally(() => {
+            if (endSync) endSync();
+          });
+      } else {
+        const matchedIndents = pendingPoRecords.filter(
+          r => r.partyName === data.vendorName &&
+            (selectedRowIds.length === 0 || selectedRowIds.includes(r.id))
         );
-        const poQty = matchedFormItem ? parseFloat(matchedFormItem.quantity) : indent.quantity;
-        const poRate = matchedFormItem ? parseFloat(matchedFormItem.rate) : indent.rate;
-        const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
-        const poGst = matchedFormItem ? parseFloat(matchedFormItem.gst) : indent.gst;
 
-        const afterDiscount = poQty * poRate * (1 - poDiscount / 100);
-        const discounted = afterDiscount;
-        const total = afterDiscount * (1 + poGst / 100);
+        // 1. Submit the new PO records to PO-History (Columns A-R)
+        const historyRows = [];
+        for (const indent of matchedIndents) {
+          const matchedFormItem = data.items?.find(
+            it => it.indentNumber === indent.indentNumber &&
+              it.itemCode === indent.itemCode
+          );
+          const poQty = matchedFormItem ? parseFloat(matchedFormItem.quantity) : indent.quantity;
+          const poRate = matchedFormItem ? parseFloat(matchedFormItem.rate) : indent.rate;
+          const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
+          const poGst = matchedFormItem ? parseFloat(matchedFormItem.gst) : indent.gst;
 
-        historyRows.push([
-          formatTimestamp(new Date()), // Timestamp (A)
-          indent.indentNumber || "",   // Indent No. (B)
-          indent.serialNo,             // Serial No. (C)
-          data.vendorName || "",       // Party Name (D)
-          data.poNumber || "",         // Po Number (E)
-          indent.itemCode || "",       // Product Code (F)
-          indent.itemName || "",       // Product (G)
-          indent.description || "",    // Description (H)
-          poQty,                       // Quntity (I)
-          indent.unit || "",           // Unit (J)
-          poRate,                      // Rate (K)
-          poDiscount,                  // Discount% (L)
-          poGst,                       // Gst % (M)
-          discounted,                  // Amount (N)
-          total,                       // Total Amount (O)
-          fileUrl,                     // PO Copy (P)
-          data.companyName || ""       // Company Name (Q)
-        ]);
+          const afterDiscount = poQty * poRate * (1 - poDiscount / 100);
+          const discounted = afterDiscount;
+          const total = afterDiscount * (1 + poGst / 100);
+
+          historyRows.push([
+            formatTimestamp(new Date()), // Timestamp (A)
+            indent.indentNumber || "",   // Indent No. (B)
+            indent.serialNo,             // Serial No. (C)
+            data.vendorName || "",       // Party Name (D)
+            data.poNumber || "",         // Po Number (E)
+            indent.itemCode || "",       // Product Code (F)
+            indent.itemName || "",       // Product (G)
+            indent.description || "",    // Description (H)
+            poQty,                       // Quntity (I)
+            indent.unit || "",           // Unit (J)
+            poRate,                      // Rate (K)
+            poDiscount,                  // Discount% (L)
+            poGst,                       // Gst % (M)
+            discounted,                  // Amount (N)
+            total,                       // Total Amount (O)
+            fileUrl,                     // PO Copy (P)
+            data.companyName || ""       // Company Name (Q)
+          ]);
+        }
+
+        await gasApi.batchInsert("PO-History", historyRows);
+
+        toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
+        onClose();
+        refresh(['indents', 'poHistory'], false)
+          .catch(err => console.error("Background refresh failed:", err))
+          .finally(() => {
+            if (endSync) endSync();
+          });
       }
-
-      await gasApi.batchInsert("PO-History", historyRows);
-
-      toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
-      onClose();
-      // Start background refresh without global spinner, cleanup sync status at end
-      refresh(['indents', 'poHistory'], false)
-        .catch(err => console.error("Background refresh failed:", err))
-        .finally(() => {
-          if (endSync) endSync();
-        });
     } catch (err) {
-      console.error("Failed to generate PO:", err);
+      console.error("Failed to process PO:", err);
       toast.error(err.message || "Failed to write PO details to spreadsheet.");
       if (endSync) endSync();
     } finally {
@@ -386,7 +510,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <Typography variant="subtitle1" fontWeight={700}>
-          {isViewMode ? `View PO: ${viewRecord?.poNumber}` : 'Generate Purchase Order'}
+          {isViewMode ? `View PO: ${viewRecord?.poNumber}` : isReviseMode ? 'Revise Purchase Order' : 'Generate Purchase Order'}
         </Typography>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={handlePrint} disabled={submitting}>Print</Button>
@@ -448,15 +572,15 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             </Box>
           </Box>
 
-          {/* 2. Supplier & PO Info */}
+          {/* 2. Vendor & PO Info */}
           <Box sx={{ display: 'flex', borderBottom: '2px solid #000', minHeight: '80px' }}>
             <Box sx={{ flex: 1, p: 1, borderRight: '2px solid #000' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>Supplier:- </Typography>
+                <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>Vendor:- </Typography>
                 <Typography variant="caption" fontWeight={700} sx={{ flex: 1, color: '#1976d2', fontSize: '0.75rem' }}>
                   {data.vendorName || '—'}
                 </Typography>
-                <input type="hidden" {...register('supplierId')} />
+                <input type="hidden" {...register('vendorId')} />
               </Box>
               <Box sx={{ display: 'flex', mb: 0.5 }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>Address:- </Typography>
@@ -470,7 +594,35 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             <Box sx={{ width: '300px', p: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>PO No : </Typography>
-                <TransparentInput {...register('poNumber')} readOnly={true} />
+                {isReviseMode ? (
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    variant="standard"
+                    value={data.poNumber || ''}
+                    InputProps={{
+                      disableUnderline: true,
+                      style: { fontSize: '0.7rem', fontWeight: 600, padding: 0, color: '#000' }
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        padding: 0,
+                        height: 'auto',
+                        color: '#000 !important',
+                        WebkitTextFillColor: '#000 !important'
+                      }
+                    }}
+                    onChange={(e) => setValue('poNumber', e.target.value)}
+                  >
+                    <MenuItem value="" disabled>Select PO Number</MenuItem>
+                    {uniquePoNumbers.map(num => (
+                      <MenuItem key={num} value={num}>{num}</MenuItem>
+                    ))}
+                  </TextField>
+                ) : (
+                  <TransparentInput {...register('poNumber')} readOnly={true} />
+                )}
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>PO Date : </Typography>

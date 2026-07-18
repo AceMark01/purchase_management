@@ -48,7 +48,7 @@ const LIST_COLS = [
   { key: 'indentNumber', label: 'Indent Number', render: v => <Chip label={v} size="small" color="primary" sx={{ fontWeight: 700, fontSize: '0.7rem', height: 22 }} /> },
   { key: 'serialNo', label: 'Serial No.' },
   { key: 'orderBy', label: 'Order By' },
-  { key: 'partyName', label: 'Party Name', render: v => <Typography variant="body2" fontWeight={600}>{v}</Typography> },
+  { key: 'partyName', label: 'Vendor', render: v => <Typography variant="body2" fontWeight={600}>{v}</Typography> },
   { key: 'groupName', label: 'Group Name' },
   { key: 'itemName', label: 'Item Name', render: v => <Typography variant="body2" sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Typography> },
   { key: 'itemCode', label: 'Item Code' },
@@ -450,10 +450,10 @@ export default function IndentManagementPage() {
                 )} />
               </Grid>
 
-              {/* Party Name */}
+              {/* Vendor */}
               <Grid item xs={12} sm={6}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                  Party Name (Vendor)<span style={{ color: 'red' }}>*</span>
+                  Vendor<span style={{ color: 'red' }}>*</span>
                 </Typography>
                 <Controller name="partyName" control={control} rules={{ required: true }} render={({ field }) => (
                   <TextField

@@ -23,7 +23,7 @@ const SectionLabel = ({ children }) => (
 
 export default function TallyEntryForm({ open, onClose, record, groupIds }) {
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow } = useData();
+  const { refresh, updateRow, startSync, endSync } = useData();
   
   const [poFile, setPoFile] = useState(null);
   const [biltyFile, setBiltyFile] = useState(null);
@@ -54,6 +54,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     const folderId = import.meta.env.VITE_FOLDER_TALLY;
 
     let poUrl = '';
@@ -112,6 +113,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
       toast.error(err.message || "Failed to save tally entry status to database.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 

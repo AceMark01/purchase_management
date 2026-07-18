@@ -3,12 +3,14 @@ import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  TextField, Box, Typography, IconButton, Grid, Divider, InputAdornment, MenuItem
+  TextField, Box, Typography, IconButton, Grid, Divider, InputAdornment, MenuItem,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useData } from '../../contexts/DataContext';
 import { gasApi } from '../../services/gasApi';
 import { formatTimestamp } from '../../utils/formatters';
@@ -27,14 +29,12 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
   const [billFile, setBillFile] = useState(null);
   const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [productRows, setProductRows] = useState([]);
 
   const { register, handleSubmit, formState: { errors }, watch, setValue, control } = useForm({
     defaultValues: {
-      productName: record?.itemName || '',
-      quantity: record?.quantity || '',
       billNo: '',
       billImage: null,
-      qualityCondition: 'Good',
       transporterName: '',
       vehicleNo: '',
       driverNo: '',
@@ -51,11 +51,20 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
 
   useEffect(() => {
     if (open && record) {
-      setValue('productName', record.itemName || '');
-      setValue('quantity', record.quantity || '');
+      const ids = groupIds?.length ? groupIds : [record.id];
+      const matched = allRecords.filter(r => ids.includes(r.id));
+      setProductRows(matched.map(r => ({
+        id: r.id,
+        groupName: r.groupName || '',
+        itemName: r.itemName || '',
+        unit: r.unit || '',
+        quantity: r.quantity || 0,
+        qualityCondition: 'Good',
+        originalRecord: r
+      })));
+
       setValue('billNo', '');
       setValue('billImage', null);
-      setValue('qualityCondition', 'Good');
       setBillFile(null);
 
       // Logistics default values
@@ -71,7 +80,19 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       
       setIsSubmitting(false);
     }
-  }, [open, record, setValue]);
+  }, [open, record, groupIds, allRecords, setValue]);
+
+  const handleQuantityChange = (id, val) => {
+    setProductRows(prev => prev.map(row => row.id === id ? { ...row, quantity: Number(val) } : row));
+  };
+
+  const handleQualityConditionChange = (id, val) => {
+    setProductRows(prev => prev.map(row => row.id === id ? { ...row, qualityCondition: val } : row));
+  };
+
+  const handleRemoveRow = (id) => {
+    setProductRows(prev => prev.filter(row => row.id !== id));
+  };
 
   const handleBillFileChange = (e) => {
     const file = e.target.files[0];
@@ -98,8 +119,22 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
 
   const onSubmit = async (data) => {
     if (!record) return;
-    const ids = groupIds?.length ? groupIds : [record.id];
-    const matchedRecords = allRecords.filter(r => ids.includes(r.id));
+    if (productRows.length === 0) {
+      toast.error("Please include at least one product row to receive.");
+      return;
+    }
+
+    const invalidItem = productRows.find(item => !item.quantity || Number(item.quantity) <= 0);
+    if (invalidItem) {
+      toast.error(`Please enter a valid quantity (> 0) for ${invalidItem.itemName}`);
+      return;
+    }
+
+    const matchedRecords = productRows.map(row => ({
+      ...row.originalRecord,
+      quantity: row.quantity,
+      qualityCondition: row.qualityCondition
+    }));
 
     setIsSubmitting(true);
     if (startSync) startSync();
@@ -150,30 +185,12 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
       const timestamp = formatTimestamp();
 
       if (!liftNo) {
-        // Direct receiving: Insert logistics details to generate unique lift number safely on backend
-        const headersList = headers?.logistics || [
-          "Timestamp",
-          "LN-Lift Number",
-          "Indent No.",
-          "Party Name",
-          "Material Name",
-          "Transporter Name",
-          "Vehicle No.",
-          "Driver No.",
-          "Bilty No.",
-          "Bilty Image",
-          "Transporting Amount",
-          "Party Address",
-          "Party Location Link",
-          "Planned 1",
-          "Actual 1",
-          "Time Delay 1"
-        ];
+        const headersList = headers?.logistics || ["Timestamp", "LN-Lift Number", "Indent No.", "Party Name", "Material Name", "Transporter Name", "Vehicle No.", "Driver No.", "Bilty No.", "Bilty Image", "Transporting Amount", "Party Address", "Party Location Link", "Planned 1", "Actual 1", "Time Delay 1"];
 
         const logisticsRows = matchedRecords.map(rec => {
           const rowObj = {
             "Timestamp": timestamp,
-            "LN-Lift Number": "", // Generated by backend
+            "LN-Lift Number": "",
             "Indent No.": rec.indentNumber,
             "Party Name": rec.partyName,
             "Material Name": rec.itemName,
@@ -199,38 +216,16 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
         liftNo = logResult.liftNumber;
       }
 
-      // Loop sequentially to write each receiving row
-      const receivingHeaders = headers?.receiving || [
-        "Timestamp",
-        "Lift No.",
-        "Indent No.",
-        "Party Name",
-        "Product Name",
-        "Qty",
-        "Product Name2",
-        "Qty2",
-        "Product Name3",
-        "Qty3",
-        "Product Name4",
-        "Qty4",
-        "Product Name5",
-        "Qty5",
-        "Bill No.",
-        "Quality Check",
-        "Bill Image",
-        "lift Status",
-        "Status"
-      ];
+      const receivingHeaders = headers?.receiving || ["Timestamp", "Lift No.", "Indent No.", "Party Name", "Product Name", "Qty", "Product Name2", "Qty2", "Product Name3", "Qty3", "Product Name4", "Qty4", "Product Name5", "Qty5", "Bill No.", "Quality Check", "Bill Image", "lift Status", "Status"];
 
       const receivingRows = matchedRecords.map(rec => {
-        const itemQty = matchedRecords.length === 1 ? Number(data.quantity) : rec.quantity;
         const rowObj = {
           "Timestamp": timestamp,
           "Lift No.": liftNo,
           "Indent No.": rec.indentNumber,
           "Party Name": rec.partyName,
           "Product Name": rec.itemName,
-          "Qty": itemQty,
+          "Qty": rec.quantity,
           "Product Name2": "",
           "Qty2": "",
           "Product Name3": "",
@@ -240,7 +235,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           "Product Name5": "",
           "Qty5": "",
           "Bill No.": data.billNo,
-          "Quality Check": data.qualityCondition,
+          "Quality Check": rec.qualityCondition,
           "Bill Image": billImageUrl || (billFile ? billFile.name : ''),
           "lift Status": "",
           "Status": ""
@@ -253,12 +248,9 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
         throw new Error(recResult.error || "Receiving batch insert failed");
       }
 
-      // Update Actual 1 in LIFT-RECEIVED if logistics row existed (arranged flow)
       for (const rec of matchedRecords) {
         if (rec._logisticsRow) {
-          await updateRow('logistics', rec._logisticsRow, {
-            "Actual 1": timestamp
-          }, false);
+          await updateRow('logistics', rec._logisticsRow, { "Actual 1": timestamp }, false);
         }
       }
 
@@ -275,7 +267,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
       PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh' } }}>
 
       <DialogTitle sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
@@ -286,7 +278,9 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           <Box>
             <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Receive Material Verification</Typography>
             {record && (
-              <Typography variant="caption" color="text.secondary">Indent: {record.indentNumber} &nbsp;·&nbsp; {record.itemName}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                PO: {record.poNumber || '—'} &nbsp;·&nbsp; Vendor: {record.partyName}
+              </Typography>
             )}
           </Box>
         </Box>
@@ -297,26 +291,68 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
         <DialogContent sx={{ px: 3, py: 2.5, overflowY: 'auto' }}>
           <SectionLabel>Material & Receiving Details</SectionLabel>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mb: 2 }}>
-            <Grid container spacing={2.5}>
-              <Grid item xs={8}>
-                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                  Product Name
-                </Typography>
-                <TextField fullWidth size="small"
-                  value={record?.itemName || ''}
-                  InputProps={{ readOnly: true }}
-                  sx={{ bgcolor: 'action.hover', '& input': { color: 'text.secondary', fontWeight: 600 } }}
-                />
-              </Grid>
-              <Grid item xs={4}>
-                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                  Quantity <span style={{ color: 'red' }}>*</span>
-                </Typography>
-                <TextField fullWidth size="small" type="number"
-                  {...register('quantity', { required: 'Required' })}
-                  error={!!errors.quantity} helperText={errors.quantity?.message} />
-              </Grid>
-            </Grid>
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, maxHeight: 300 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                    {['S.No.', 'Group', 'Item', 'Unit', 'Quantity *', 'Quality Condition *', 'Action'].map(h => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, color: 'text.secondary', bgcolor: 'background.paper' }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {productRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.disabled', fontSize: '0.85rem' }}>
+                        No items to receive.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    productRows.map((row, index) => (
+                      <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                        <TableCell sx={{ py: 0.75, px: 1.5, fontSize: '0.8rem', fontWeight: 600 }}>{index + 1}</TableCell>
+                        <TableCell sx={{ py: 0.75, px: 1.5, fontSize: '0.78rem', color: 'text.secondary' }}>{row.groupName}</TableCell>
+                        <TableCell sx={{ py: 0.75, px: 1.5, fontSize: '0.8rem', fontWeight: 500 }}>{row.itemName}</TableCell>
+                        <TableCell sx={{ py: 0.75, px: 1.5, fontSize: '0.78rem' }}>{row.unit}</TableCell>
+                        <TableCell sx={{ py: 0.75, px: 1 }}>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={row.quantity}
+                            onChange={(e) => handleQuantityChange(row.id, e.target.value)}
+                            inputProps={{ min: 0, style: { padding: '5px 6px', fontSize: '0.82rem', fontWeight: 600, width: 80 } }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, '& fieldset': { borderColor: '#3b82f6' } } }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.75, px: 1 }}>
+                          <TextField
+                            select
+                            size="small"
+                            value={row.qualityCondition}
+                            onChange={(e) => handleQualityConditionChange(row.id, e.target.value)}
+                            inputProps={{ style: { padding: '5px 6px', fontSize: '0.82rem' } }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, minWidth: 110 } }}
+                          >
+                            <MenuItem value="Good">Good</MenuItem>
+                            <MenuItem value="Average">Average</MenuItem>
+                            <MenuItem value="Bad">Bad</MenuItem>
+                          </TextField>
+                        </TableCell>
+                        <TableCell align="center" sx={{ py: 0.75, px: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveRow(row.id)}
+                            sx={{ bgcolor: '#ef4444', color: 'white', '&:hover': { bgcolor: '#dc2626' }, p: 0.5, borderRadius: 1 }}
+                          >
+                            <DeleteIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Box>
 
           {!record?.liftNo && (
@@ -419,7 +455,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
           <SectionLabel>Verification & Billing</SectionLabel>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <Grid container spacing={2.5}>
-              <Grid item xs={4}>
+              <Grid item xs={6}>
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
                   Bill No. <span style={{ color: 'red' }}>*</span>
                 </Typography>
@@ -427,20 +463,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
                   {...register('billNo', { required: 'Required' })}
                   error={!!errors.billNo} helperText={errors.billNo?.message} />
               </Grid>
-              <Grid item xs={4}>
-                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
-                  Quality Condition <span style={{ color: 'red' }}>*</span>
-                </Typography>
-                <Controller name="qualityCondition" control={control} rules={{ required: 'Required' }}
-                  render={({ field }) => (
-                    <TextField {...field} select fullWidth size="small" error={!!errors.qualityCondition} helperText={errors.qualityCondition?.message}>
-                      <MenuItem value="Good">Good</MenuItem>
-                      <MenuItem value="Average">Average</MenuItem>
-                      <MenuItem value="Bad">Bad</MenuItem>
-                    </TextField>
-                  )} />
-              </Grid>
-              <Grid item xs={4}>
+              <Grid item xs={6}>
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
                   Bill Image (Optional)
                 </Typography>
@@ -457,7 +480,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
                     {billImageFile ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                         <CheckCircleOutlineIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                        <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: '100px' }}>{billImageFile.name}</Typography>
+                        <Typography variant="body2" fontWeight={600} color="success.main" noWrap sx={{ maxWidth: '180px' }}>{billImageFile.name}</Typography>
                       </Box>
                     ) : (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

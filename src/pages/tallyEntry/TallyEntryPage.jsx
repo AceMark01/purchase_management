@@ -3,7 +3,6 @@ import { useSelector }                     from 'react-redux';
 import { Box, Button, Link }               from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon   from '@mui/icons-material/OpenInNew';
-import { ViewBtn }     from '../../components/common/ActionButtons';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -18,16 +17,6 @@ const getHistoryCols = (onViewPO) => [
   { key: 'tallyPlanned', label: 'Planned 3', minWidth: 155 },
   { key: 'tallyActual', label: 'Actual 3', minWidth: 155 },
   { key: 'tallyTimeDelay', label: 'Time Delay', minWidth: 110 },
-  {
-    key: 'poAttach',
-    label: 'PO Attach',
-    minWidth: 110,
-    render: (_v, row) => row.poAttach ? (
-      <Link href={row.poAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
-        View PO
-      </Link>
-    ) : '—',
-  },
   {
     key: 'biltyAttach',
     label: 'Bilty Attach',
@@ -48,6 +37,21 @@ const getHistoryCols = (onViewPO) => [
       </Link>
     ) : '—',
   },
+  {
+    key: 'poViewLink',
+    label: 'PO Document',
+    minWidth: 120,
+    render: (_v, row) => row.poNumber ? (
+      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+      </Link>
+    ) : '—',
+  },
+];
+
+const getPendingCols = (onViewPO) => [
+  ...PO_COLUMNS,
   {
     key: 'poViewLink',
     label: 'PO Document',
@@ -115,6 +119,7 @@ export default function TallyEntryPage() {
 
   const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
   const historyCols  = useMemo(() => getHistoryCols(handleViewPO), []);
+  const pendingCols  = useMemo(() => getPendingCols(handleViewPO), []);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {
@@ -127,7 +132,7 @@ export default function TallyEntryPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -141,12 +146,13 @@ export default function TallyEntryPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : PO_COLUMNS}
+        columns={tabValue === 1 ? historyCols : pendingCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending Tally Entry' : 'Tally History'}
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {tallyOpen && (

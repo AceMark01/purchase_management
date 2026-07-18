@@ -3,7 +3,6 @@ import { useSelector }                     from 'react-redux';
 import { Box, Button, Link }               from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon   from '@mui/icons-material/OpenInNew';
-import { ViewBtn }     from '../../components/common/ActionButtons';
 import DataTable              from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
 import WorkflowTabs           from '../../components/common/WorkflowTabs';
@@ -12,7 +11,15 @@ import ReceiveMaterialForm    from '../../components/receiveMaterial/ReceiveMate
 import GeneratePOForm         from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 
+const liftNoCol = {
+  key: 'liftNo',
+  label: 'Lift No.',
+  minWidth: 120,
+  render: (v) => v || '—'
+};
+
 const getHistoryCols = (onViewPO) => [
+  liftNoCol,
   ...PO_COLUMNS,
   {
     key: 'poViewLink',
@@ -73,7 +80,7 @@ export default function ReceiveMaterialPage() {
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -87,12 +94,13 @@ export default function ReceiveMaterialPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={tabValue === 1 ? historyCols : PO_COLUMNS}
+        columns={historyCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending Receive' : 'Receive History'}
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {receiveOpen && (

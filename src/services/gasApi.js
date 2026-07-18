@@ -1,12 +1,16 @@
 const GAS_URL = import.meta.env.VITE_GAS_URL;
+const GAS_URL_PRODUCTS = import.meta.env.VITE_GAS_URL_PRODUCTS;
 
 if (!GAS_URL) {
   console.warn("VITE_GAS_URL is not defined in the environment. Please check your .env file.");
 }
+if (!GAS_URL_PRODUCTS) {
+  console.warn("VITE_GAS_URL_PRODUCTS is not defined in the environment. Please check your .env file.");
+}
 
-async function get(params) {
+async function get(params, baseUrl = GAS_URL) {
   const query = new URLSearchParams(params).toString();
-  const url = `${GAS_URL}?${query}`;
+  const url = `${baseUrl}?${query}`;
   const response = await fetch(url, {
     method: 'GET',
     mode: 'cors',
@@ -21,12 +25,12 @@ async function get(params) {
   return result;
 }
 
-async function post(params) {
+async function post(params, baseUrl = GAS_URL) {
   const formData = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     formData.append(key, typeof value === 'object' ? JSON.stringify(value) : value);
   }
-  const response = await fetch(GAS_URL, {
+  const response = await fetch(baseUrl, {
     method: 'POST',
     mode: 'cors',
     headers: {
@@ -46,11 +50,14 @@ async function post(params) {
 
 export const gasApi = {
   fetchSheet: (sheetName) => get({ sheet: sheetName }),
+  fetchProductSheet: (sheetName) => get({ sheet: sheetName }, GAS_URL_PRODUCTS),
+  fetchVendorSheet: (sheetName) => get({ sheet: sheetName }, GAS_URL_PRODUCTS),
+  updateProductCells: (sheetName, cells) => post({ action: 'updateCells', sheetName, cells: JSON.stringify(cells) }, GAS_URL_PRODUCTS),
   // Read operations (single fetch for all sheets to optimize loading time)
   bootstrap: async () => {
     const activeSheets = [
       { key: "indents", name: "INDENT-PO" },
-      { key: "whatsapp", name: "Whatsapp Form" },
+      { key: "whatsapp", name: "Whatsapp-Orders" },
       { key: "followUps", name: "Flw-up" },
       { key: "poGenerate", name: "Po Generate" },
       { key: "poHistory", name: "PO-History" },

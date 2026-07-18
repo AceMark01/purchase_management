@@ -37,6 +37,7 @@ const PAGE_TITLES = {
   '/master':           { label: 'Company Master',         sub: 'Manage company records' },
   '/product-data':     { label: 'Product Master',         sub: 'Manage product catalog' },
   '/vendors':          { label: 'Vendor Master',          sub: 'Manage vendor records' },
+  '/whatsapp':         { label: 'WhatsApp Form',          sub: 'Capture and record incoming WhatsApp orders' },
 };
 
 const NOTIF_ICONS = {

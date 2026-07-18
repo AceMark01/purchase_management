@@ -6,34 +6,20 @@ import {
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ThumbUpIcon     from '@mui/icons-material/ThumbUp';
-import OpenInNewIcon   from '@mui/icons-material/OpenInNew';
-import { ViewBtn, PrintBtn } from '../../components/common/ActionButtons';
-import { toast }              from 'react-toastify';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { toast } from 'react-toastify';
 import { useData } from '../../contexts/DataContext';
 import { formatTimestamp } from '../../utils/formatters';
-import DataTable              from '../../components/common/DataTable';
+import DataTable from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
-import WorkflowTabs           from '../../components/common/WorkflowTabs';
-import PageHeader             from '../../components/common/PageHeader';
-import GeneratePOForm         from '../../components/po/GeneratePOForm';
+import WorkflowTabs from '../../components/common/WorkflowTabs';
+import PageHeader from '../../components/common/PageHeader';
+import GeneratePOForm from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 
 const getHistoryCols = (onViewPO) => [
-  ...PO_COLUMNS.filter(c => c.key !== 'status'),
-  {
-    key: 'status',
-    label: 'Status',
-    minWidth: 120,
-    render: (v) => (
-      <Chip
-        label={v || 'N/A'}
-        size="small"
-        color={v === 'Approved' ? 'success' : v === 'Rejected' ? 'error' : 'default'}
-        sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
-      />
-    ),
-  },
+  ...PO_COLUMNS,
   {
     key: 'approvalRemarks',
     label: 'Remarks',
@@ -55,16 +41,16 @@ const getHistoryCols = (onViewPO) => [
       </Link>
     ) : '—',
   },
-];export default function ApprovalPurchasePOPage() {
+]; export default function ApprovalPurchasePOPage() {
   const { refresh, updateRow, startSync, endSync } = useData();
   const records = useSelector((s) => s.workflow.records);
 
-  const [tabValue,       setTabValue]       = useState(0);
+  const [tabValue, setTabValue] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
-  const [confirmOpen,    setConfirmOpen]    = useState(false);
-  const [selectedRow,    setSelectedRow]    = useState(null);
-  const [poViewOpen,     setPoViewOpen]     = useState(false);
-  const [poViewRecord,   setPoViewRecord]   = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [poViewOpen, setPoViewOpen] = useState(false);
+  const [poViewRecord, setPoViewRecord] = useState(null);
 
   const stageRecords = useMemo(() => {
     const recs = tabValue === 0
@@ -78,11 +64,11 @@ const getHistoryCols = (onViewPO) => [
       const f = appliedFilters;
       return (
         (!f.indentNumber || (i.indentNumber || '').toLowerCase().includes(f.indentNumber.toLowerCase())) &&
-        (!f.partyName    || i.partyName.toLowerCase().includes(f.partyName.toLowerCase()))               &&
-        (!f.companyName  || i.companyName.toLowerCase().includes(f.companyName.toLowerCase()))           &&
-        (!f.status       || i.status === f.status)                                                       &&
-        (!f.dateFrom     || i.createdDate >= f.dateFrom)                                                 &&
-        (!f.dateTo       || i.createdDate <= f.dateTo)
+        (!f.partyName || i.partyName.toLowerCase().includes(f.partyName.toLowerCase())) &&
+        (!f.companyName || i.companyName.toLowerCase().includes(f.companyName.toLowerCase())) &&
+        (!f.status || i.status === f.status) &&
+        (!f.dateFrom || i.createdDate >= f.dateFrom) &&
+        (!f.dateTo || i.createdDate <= f.dateTo)
       );
     }), [stageRecords, appliedFilters]);
 
@@ -145,12 +131,12 @@ const getHistoryCols = (onViewPO) => [
       const vals = row._indentNumbers || (row.indentNumber ? [row.indentNumber] : []);
       if (!vals.length) return '—';
       return vals.map(num => (
-        <Chip 
-          key={num} 
-          label={num} 
-          size="small" 
-          color="primary" 
-          sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, mr: 0.5, mb: 0.5 }} 
+        <Chip
+          key={num}
+          label={num}
+          size="small"
+          color="primary"
+          sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, mr: 0.5, mb: 0.5 }}
         />
       ));
     }
@@ -167,10 +153,10 @@ const getHistoryCols = (onViewPO) => [
   }), []);
 
   const pendingCols = useMemo(() => {
-    const cols = [...PO_COLUMNS];
+    const cols = getHistoryCols(handleViewPO);
     cols.splice(2, 0, indentCol, serialCol);
     return cols;
-  }, [indentCol, serialCol]);
+  }, [handleViewPO, indentCol, serialCol]);
 
   const historyCols = useMemo(() => {
     const cols = getHistoryCols(handleViewPO);
@@ -188,7 +174,7 @@ const getHistoryCols = (onViewPO) => [
         </Button>
       ];
     }
-    return [<ViewBtn key="view" onClick={() => handleViewPO(row)} />];
+    return [];
   }, [tabValue]);
 
   return (
@@ -208,6 +194,7 @@ const getHistoryCols = (onViewPO) => [
         searchKey={['poNumber', 'partyName', 'companyName']}
         actions={actions}
         density="compact"
+        hideActionsColumn={tabValue === 1}
       />
 
       {/* Approval Dialog */}

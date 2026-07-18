@@ -22,6 +22,7 @@ import ReportsPage from './pages/reports/ReportsPage';
 import CompanyMasterPage from './pages/master/CompanyMasterPage';
 import ProductMasterPage from './pages/master/ProductMasterPage';
 import VendorMasterPage from './pages/vendors/VendorMasterPage';
+import WhatsAppFormPage from './pages/whatsapp/WhatsAppFormPage';
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/master"           element={<ProtectedRoute page="master"><CompanyMasterPage /></ProtectedRoute>} />
           <Route path="/product-data"     element={<ProtectedRoute page="productData"><ProductMasterPage /></ProtectedRoute>} />
           <Route path="/vendors"          element={<ProtectedRoute page="vendors"><VendorMasterPage /></ProtectedRoute>} />
+          <Route path="/whatsapp"         element={<ProtectedRoute page="whatsapp"><WhatsAppFormPage /></ProtectedRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

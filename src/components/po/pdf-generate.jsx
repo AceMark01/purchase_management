@@ -59,13 +59,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold'
   },
   
-  // 2. Supplier & PO Info
+  // 2. Vendor & PO Info
   infoRow: {
     flexDirection: 'row',
     borderBottom: '1pt solid #000',
     minHeight: 50
   },
-  supplierBox: {
+  vendorBox: {
     flex: 1,
     padding: 6,
     borderRight: '1pt solid #000'
@@ -304,11 +304,11 @@ export const POPDFDocument = ({ data }) => {
             </View>
           </View>
 
-          {/* 2. Supplier & PO Info */}
+          {/* 2. Vendor & PO Info */}
           <View style={styles.infoRow}>
-            <View style={styles.supplierBox}>
+            <View style={styles.vendorBox}>
               <View style={styles.infoField}>
-                <Text style={styles.infoLabel}>Supplier:- </Text>
+                <Text style={styles.infoLabel}>Vendor:- </Text>
                 <Text style={[styles.infoValue, { color: '#1976d2', fontFamily: 'Helvetica-Bold' }]}>{data.vendorName || '—'}</Text>
               </View>
               <View style={styles.infoField}>

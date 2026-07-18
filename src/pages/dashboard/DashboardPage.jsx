@@ -7,14 +7,14 @@ import {
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { useData } from '../../contexts/DataContext';
-import DescriptionIcon  from '@mui/icons-material/Description';
-import PendingIcon      from '@mui/icons-material/Pending';
-import CheckCircleIcon  from '@mui/icons-material/CheckCircle';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PendingIcon from '@mui/icons-material/Pending';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import CallIcon         from '@mui/icons-material/Call';
-import StatCard         from '../../components/common/StatCard';
-import PageHeader       from '../../components/common/PageHeader';
+import CallIcon from '@mui/icons-material/Call';
+import StatCard from '../../components/common/StatCard';
+import PageHeader from '../../components/common/PageHeader';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 /* Generic mini table inside cards */

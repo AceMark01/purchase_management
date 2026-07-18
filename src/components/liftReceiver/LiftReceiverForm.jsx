@@ -23,7 +23,7 @@ const SectionLabel = ({ children }) => (
 
 export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
   const allRecords = useSelector((state) => state.workflow.records) || [];
-  const { refresh, updateRow } = useData();
+  const { refresh, updateRow, startSync, endSync } = useData();
   const [receiverFile, setReceiverFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -61,6 +61,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
     setIsSubmitting(true);
+    if (startSync) startSync();
     let receiverImageUrl = '';
     const folderId = import.meta.env.VITE_FOLDER_LIFTED;
 
@@ -126,6 +127,7 @@ export default function LiftReceiverForm({ open, onClose, record, groupIds }) {
       toast.error(err.message || "Failed to save verification status to database.");
     } finally {
       setIsSubmitting(false);
+      if (endSync) endSync();
     }
   };
 
