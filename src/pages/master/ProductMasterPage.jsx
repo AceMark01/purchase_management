@@ -140,7 +140,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
                 {...register('productType')}
               />
             </Box>
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <FormControl fullWidth size="small" error={!!errors.supplierName}>
                 <InputLabel id="vendor-name-label" shrink sx={{ bgcolor: 'background.paper', px: 0.5 }}>Vendor Name</InputLabel>
                 <Controller
@@ -164,7 +164,7 @@ function ProductForm({ open, onClose, editItem, onSave }) {
                         }}
                         label="Vendor Name"
                         disabled={submitting}
-                        renderValue={(selected) => selected.join(', ')}
+                        renderValue={(selected) => (selected && selected.length ? `${selected.length} selected` : '')}
                         sx={{ fontSize: '0.875rem' }}
                       >
                         {uniqueVendors.map((v) => (
