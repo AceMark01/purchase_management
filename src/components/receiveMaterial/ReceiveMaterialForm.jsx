@@ -59,6 +59,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
         itemName: r.itemName || '',
         unit: r.unit || '',
         quantity: r.quantity || 0,
+        maxQuantity: r.quantity || 0,
         qualityCondition: 'Good',
         originalRecord: r
       })));
@@ -83,7 +84,20 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
   }, [open, record, groupIds, allRecords, setValue]);
 
   const handleQuantityChange = (id, val) => {
-    setProductRows(prev => prev.map(row => row.id === id ? { ...row, quantity: Number(val) } : row));
+    setProductRows(prev => prev.map(row => {
+      if (row.id === id) {
+        if (val === '') {
+          return { ...row, quantity: '' };
+        }
+        let numVal = parseFloat(val);
+        if (isNaN(numVal)) {
+          numVal = 0;
+        }
+        const clampedVal = Math.max(0, Math.min(row.maxQuantity, numVal));
+        return { ...row, quantity: clampedVal };
+      }
+      return row;
+    }));
   };
 
   const handleQualityConditionChange = (id, val) => {
@@ -132,7 +146,7 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
 
     const matchedRecords = productRows.map(row => ({
       ...row.originalRecord,
-      quantity: row.quantity,
+      quantity: Number(row.quantity) || 0,
       qualityCondition: row.qualityCondition
     }));
 
@@ -320,7 +334,11 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
                             type="number"
                             value={row.quantity}
                             onChange={(e) => handleQuantityChange(row.id, e.target.value)}
-                            inputProps={{ min: 0, style: { padding: '5px 6px', fontSize: '0.82rem', fontWeight: 600, width: 80 } }}
+                            inputProps={{ 
+                              min: 0, 
+                              max: row.maxQuantity, 
+                              style: { padding: '5px 6px', fontSize: '0.82rem', fontWeight: 600, width: 80 } 
+                            }}
                             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, '& fieldset': { borderColor: '#3b82f6' } } }}
                           />
                         </TableCell>
