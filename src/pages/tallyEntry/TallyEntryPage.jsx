@@ -10,13 +10,29 @@ import PageHeader             from '../../components/common/PageHeader';
 import TallyEntryForm         from '../../components/tallyEntry/TallyEntryForm';
 import GeneratePOForm         from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
+import { formatDate } from '../../utils/formatters';
 
 const getHistoryCols = (onViewPO) => [
   ...PO_COLUMNS,
-  { key: 'tallyStatus', label: 'Tally Status', minWidth: 110 },
-  { key: 'tallyPlanned', label: 'Planned 3', minWidth: 155 },
-  { key: 'tallyActual', label: 'Actual 3', minWidth: 155 },
-  { key: 'tallyTimeDelay', label: 'Time Delay', minWidth: 110 },
+  { key: 'tallyPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
+  { key: 'tallyActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
+  { 
+    key: 'tallyTimeDelay', 
+    label: 'TIME DELAY', 
+    minWidth: 110,
+    render: (_v, row) => {
+      if (!row.tallyPlanned || !row.tallyActual) return '00:00:00';
+      const pTime = new Date(row.tallyPlanned);
+      const aTime = new Date(row.tallyActual);
+      if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
+      const diffMs = Math.abs(aTime - pTime);
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+      const ss = String(totalSeconds % 60).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
+    }
+  },
   {
     key: 'biltyAttach',
     label: 'Bilty Attach',

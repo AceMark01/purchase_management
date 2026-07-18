@@ -106,7 +106,7 @@ export default function TallyEntryForm({ open, onClose, record, groupIds }) {
         }
       }
       toast.success(`Tally Entry finalised! ${matchedRecords.length} item(s) — workflow complete.`);
-      await refresh(['indents'], false);
+      await refresh(['indents', 'receiving'], false);
       onClose();
     } catch (err) {
       console.error("Failed to finalise tally entry:", err);

@@ -10,13 +10,29 @@ import PageHeader             from '../../components/common/PageHeader';
 import LiftReceiverForm       from '../../components/liftReceiver/LiftReceiverForm';
 import GeneratePOForm         from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
+import { formatDate } from '../../utils/formatters';
 
 const getHistoryCols = (onViewPO) => [
   ...PO_COLUMNS,
-  { key: 'liftStatus', label: 'Lift Status', minWidth: 110 },
-  { key: 'liftPlanned', label: 'Planned 2', minWidth: 155 },
-  { key: 'liftActual', label: 'Actual 2', minWidth: 155 },
-  { key: 'liftTimeDelay', label: 'Time Delay 2', minWidth: 110 },
+  { key: 'liftPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
+  { key: 'liftActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
+  { 
+    key: 'liftTimeDelay', 
+    label: 'TIME DELAY', 
+    minWidth: 110,
+    render: (_v, row) => {
+      if (!row.liftPlanned || !row.liftActual) return '00:00:00';
+      const pTime = new Date(row.liftPlanned);
+      const aTime = new Date(row.liftActual);
+      if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
+      const diffMs = Math.abs(aTime - pTime);
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+      const ss = String(totalSeconds % 60).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
+    }
+  },
   {
     key: 'liftedImage',
     label: 'Lifted Image',
