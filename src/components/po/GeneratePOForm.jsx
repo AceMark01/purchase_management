@@ -135,7 +135,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     if (ven) {
       setValue('vendorId', ven.vendorId);
       setValue('vendorGst', ven.gstNumber || '');
-      setValue('vendorAddress', ven.vendorLocation || 'Not available');
+      setValue('vendorAddress', ven.address || 'Not available');
     }
     
     const comp = companies.find(c => c.companyName === firstRec.companyName);
@@ -144,7 +144,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       setValue('companyGst', comp.gstNumber || '');
       setValue('companyPan', comp.panNumber || '');
       setValue('billingAddress', comp.billingAddress || '');
-      setValue('destinationAddress', comp.destination || '');
+      setValue('destinationAddress', comp.shippingAddress || '');
     }
     
     replace(poGroup.map((item, idx) => ({
@@ -192,7 +192,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       if (ven) {
         setValue('vendorId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
-        setValue('vendorAddress', ven.vendorLocation || 'Not available');
+        setValue('vendorAddress', ven.address || 'Not available');
       }
 
       const comp = companies.find(c => c.companyName === viewRecord.companyName);
@@ -201,7 +201,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         setValue('companyGst', comp.gstNumber || '');
         setValue('companyPan', comp.panNumber || '');
         setValue('billingAddress', comp.billingAddress || '');
-        setValue('destinationAddress', comp.destination || '');
+        setValue('destinationAddress', comp.shippingAddress || '');
       }
 
       replace(poGroup.map((item, idx) => ({
@@ -227,7 +227,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       if (ven) {
         setValue('vendorId', ven.vendorId);
         setValue('vendorGst', ven.gstNumber || '');
-        setValue('vendorAddress', ven.vendorLocation || 'Not available');
+        setValue('vendorAddress', ven.address || 'Not available');
       }
 
       const comp = companies.find(c => c.companyName === viewRecord.companyName);
@@ -236,7 +236,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
         setValue('companyGst', comp.gstNumber || '');
         setValue('companyPan', comp.panNumber || '');
         setValue('billingAddress', comp.billingAddress || '');
-        setValue('destinationAddress', comp.destination || '');
+        setValue('destinationAddress', comp.shippingAddress || '');
       }
 
       replace([{
@@ -265,7 +265,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
     setValue('vendorName', ven.vendorName || '');
     setValue('vendorGst', ven.gstNumber || '');
-    setValue('vendorAddress', ven.vendorLocation || 'Not available');
+    setValue('vendorAddress', ven.address || 'Not available');
 
     // Batch pending indents for this vendor (filter by selectedRowIds if provided)
     const matchedIndents = pendingPoRecords.filter(
@@ -289,7 +289,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       setValue('companyGst', comp.gstNumber || '');
       setValue('companyPan', comp.panNumber || '');
       setValue('billingAddress', comp.billingAddress || '');
-      setValue('destinationAddress', comp.destination || '');
+      setValue('destinationAddress', comp.shippingAddress || '');
     }
 
     // Build items — include indentNumber and groupName per row
