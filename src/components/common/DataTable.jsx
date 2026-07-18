@@ -137,8 +137,8 @@ export default function DataTable({
   const isLoading = loading !== undefined ? loading : dataLoading;
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const [order, setOrder]               = useState('desc');
-  const [orderBy, setOrderBy]           = useState(columns[0]?.key || '');
+  const [order, setOrder]               = useState('asc');
+  const [orderBy, setOrderBy]           = useState('');
   const [page, setPage]                 = useState(0);
   const [rowsPerPage, setRowsPerPage]   = useState(10);
   const [search, setSearch]             = useState('');
