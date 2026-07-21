@@ -20,8 +20,8 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 /* Generic mini table inside cards */
 function MiniTable({ columns, rows, emptyLabel = 'No records' }) {
   return (
-    <TableContainer sx={{ maxHeight: 350 }}>
-      <Table size="small" stickyHeader>
+    <TableContainer sx={{ maxHeight: 350, width: '100%' }}>
+      <Table size="small" stickyHeader sx={{ width: '100%', tableLayout: 'fixed' }}>
         <TableHead>
           <TableRow>
             {columns.map((c) => (
@@ -81,7 +81,7 @@ function MiniTable({ columns, rows, emptyLabel = 'No records' }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { loading } = useData();
+  const { loading, pendingPoRecords = [], poHistoryRecords = [] } = useData();
 
   const records = useSelector((s) => s.workflow.records) || [];
   const [poTab, setPoTab] = useState(0); // 0 = Pending, 1 = Completed
@@ -116,26 +116,51 @@ export default function DashboardPage() {
   }, [records]);
 
   const filteredPOs = useMemo(() => {
-    return poRecordsList.filter(r => {
-      if (poTab === 0) {
-        return r.workflowStage.sendPO === 'Pending';
-      } else {
-        return r.workflowStage.sendPO === 'Completed';
-      }
-    });
-  }, [poRecordsList, poTab]);
+    if (poTab === 0) {
+      return pendingPoRecords;
+    } else {
+      return poHistoryRecords.length > 0 ? poHistoryRecords : poRecordsList;
+    }
+  }, [pendingPoRecords, poHistoryRecords, poRecordsList, poTab]);
 
   // Today's activities
   const receivingToday = useMemo(() => {
-    return records.filter(r => r.planned1 && isToday(r.planned1));
+    return records.filter(r => {
+      const pDate = r.planned1 || r.expectedArrivalDate;
+      return (
+        pDate && 
+        String(pDate).trim() !== "" && 
+        isToday(pDate) && 
+        (!r.actual1 || String(r.actual1).trim() === "")
+      );
+    });
   }, [records]);
 
   const liftingToday = useMemo(() => {
-    return records.filter(r => r.liftPlanned && isToday(r.liftPlanned));
+    return records.filter(r => 
+      r.planned3 && 
+      String(r.planned3).trim() !== "" && 
+      isToday(r.planned3) && 
+      (!r.actual3 || String(r.actual3).trim() === "")
+    );
   }, [records]);
 
   const followUpToday = useMemo(() => {
-    return records.filter(r => r.nextFollowUpDate && isToday(r.nextFollowUpDate));
+    return records.filter(r => {
+      const hasNextFollowUp = r.nextFollowUpDate && String(r.nextFollowUpDate).trim() !== "";
+      if (hasNextFollowUp) {
+        return isToday(r.nextFollowUpDate);
+      }
+
+      // Fallback: next follow-up is not filled, check planned2 is today and actual2 is empty
+      const hasPlanned = r.planned2 && String(r.planned2).trim() !== "";
+      const hasActual = r.actual2 && String(r.actual2).trim() !== "";
+      return (
+        hasPlanned &&
+        isToday(r.planned2) &&
+        !hasActual
+      );
+    });
   }, [records]);
 
   if (loading) {
@@ -236,12 +261,13 @@ export default function DashboardPage() {
         <CardContent sx={{ p: 0 }}>
           <MiniTable
             columns={[
+              { key: 'indentNumber', label: 'Indent No.' },
               { key: 'partyName', label: 'Party (Vendor)' },
               { key: 'itemName', label: 'Item' },
               {
                 key: 'poQty',
                 label: 'Total PO QTY',
-                render: (v, r) => `${v || 0} ${r.unit || 'Nos'}`
+                render: (v, r) => `${v || r.quantity || 0} ${r.unit || 'Nos'}`
               },
               {
                 key: 'quantity',
@@ -252,11 +278,14 @@ export default function DashboardPage() {
                 key: 'poAmount',
                 label: 'PO Amount',
                 render: (_, r) => {
-                  const afterDiscount = (r.poQty || 0) * (r.poRate || 0) * (1 - (r.discount || 0) / 100);
-                  const amount = afterDiscount * (1 + (r.gst || 0) / 100);
+                  const qty = r.poQty || r.quantity || 0;
+                  const rate = r.poRate || r.rate || 0;
+                  const afterDiscount = qty * rate * (1 - (r.discount || 0) / 100);
+                  const calculatedAmount = afterDiscount * (1 + (r.gst || 0) / 100);
+                  const finalAmount = r.amount || calculatedAmount;
                   return (
                     <Typography variant="caption" fontWeight={700} color="text.primary">
-                      {formatCurrency(amount)}
+                      {formatCurrency(finalAmount)}
                     </Typography>
                   );
                 }
@@ -266,10 +295,10 @@ export default function DashboardPage() {
                 label: 'PO Number',
                 render: (v) => (
                   <Chip
-                    label={v || 'N/A'}
+                    label={v || 'Pending'}
                     size="small"
-                    variant="outlined"
-                    color="primary"
+                    variant={v ? "outlined" : "filled"}
+                    color={v ? "primary" : "warning"}
                     sx={{ fontWeight: 700, height: 20, fontSize: '0.65rem' }}
                   />
                 )
@@ -282,9 +311,9 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── 3. Today's Activities Side-by-Side ── */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2.5, mb: 3.5, width: '100%' }}>
         {/* Receiving Today */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Card sx={{ height: '100%', borderRadius: 3, border: 1, borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,.02)' }}>
             <CardHeader
               title={
@@ -331,10 +360,10 @@ export default function DashboardPage() {
               />
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
         {/* Lifting Today */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Card sx={{ height: '100%', borderRadius: 3, border: 1, borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,.02)' }}>
             <CardHeader
               title={
@@ -381,8 +410,8 @@ export default function DashboardPage() {
               />
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* ── 4. Follow-Ups Today ── */}
       <Card sx={{ borderRadius: 3, border: 1, borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,.02)' }}>

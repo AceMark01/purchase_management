@@ -25,6 +25,8 @@ import FactCheckIcon        from '@mui/icons-material/FactCheck';
 import SendIcon             from '@mui/icons-material/Send';
 import VerifiedIcon         from '@mui/icons-material/Verified';
 import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
+import { groupByPO } from '../../utils/poGroupUtils';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 export const DRAWER_WIDTH = 264;
@@ -72,12 +74,52 @@ const NAV_SECTIONS = [
 
 function NavSection({ section }) {
   const { hasAccess } = useAuth();
+  const { records = [], pendingPoRecords = [] } = useData();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
   const [isOpen, setIsOpen] = useState(true);
+
+  const getPendingCount = (page) => {
+    if (!records || records.length === 0) return 0;
+
+    switch (page) {
+      case 'purchaseOrder':
+        return pendingPoRecords.length;
+      case 'approvalPO':
+        return groupByPO(records.filter(r => r.workflowStage?.approvalPO === 'Pending')).length;
+      case 'sendPO':
+        return groupByPO(records.filter(r => r.workflowStage?.sendPO === 'Pending')).length;
+      case 'followUp':
+        return groupByPO(records.filter(r => r.workflowStage?.followUp === 'Pending')).length;
+      case 'logistics':
+        return groupByPO(records.filter(r => r.workflowStage?.logistics === 'Pending')).length;
+      case 'receiveMaterial':
+        return groupByPO(records.filter(r => r.workflowStage?.receiveMaterial === 'Pending')).length;
+      case 'liftReceiver':
+        return groupByPO(
+          records.filter(
+            r =>
+              r.liftPlanned &&
+              String(r.liftPlanned).trim() !== '' &&
+              (!r.liftActual || String(r.liftActual).trim() === '')
+          )
+        ).length;
+      case 'tallyEntry':
+        return groupByPO(
+          records.filter(
+            r =>
+              r.tallyPlanned &&
+              String(r.tallyPlanned).trim() !== '' &&
+              (!r.tallyActual || String(r.tallyActual).trim() === '')
+          )
+        ).length;
+      default:
+        return 0;
+    }
+  };
 
   const accessible = section.items.filter((i) => !i.page || hasAccess(i.page));
   if (accessible.length === 0) return null;
@@ -115,6 +157,7 @@ function NavSection({ section }) {
           {accessible.map((item) => {
             const isActive = location.pathname === item.path ||
             (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            const count = getPendingCount(item.page);
           return (
             <ListItemButton
               key={item.path}
@@ -172,6 +215,28 @@ function NavSection({ section }) {
                   </Typography>
                 }
               />
+              {count > 0 && (
+                <Box
+                  sx={{
+                    ml: 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 20,
+                    height: 20,
+                    borderRadius: '10px',
+                    px: 0.75,
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#fff',
+                    bgcolor: 'error.main',
+                    boxShadow: `0 2px 4px ${alpha(theme.palette.error.main, 0.35)}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  {count}
+                </Box>
+              )}
             </ListItemButton>
           );
         })}

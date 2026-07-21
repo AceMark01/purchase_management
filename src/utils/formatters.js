@@ -8,9 +8,9 @@ export const formatDate = (d, withTime = true) => {
   if (!d) return '';
   const str = String(d).trim();
   
-  // If already matches YYYY-MM-DD HH:mm:ss, return directly
+  // If already matches YYYY-MM-DD HH:mm:ss
   if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(str)) {
-    return str;
+    return withTime ? str : str.split(' ')[0];
   }
   // If matches YYYY-MM-DD without time, append time if requested
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
@@ -19,11 +19,12 @@ export const formatDate = (d, withTime = true) => {
   
   try {
     let date;
-    // Parse DD-MM-YYYY format safely if encountered
-    if (/^\d{2}-\d{2}-\d{4}/.test(str)) {
+    // Parse DD-MM-YYYY or DD/MM/YYYY format safely if encountered
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}/.test(str)) {
       const datePart = str.split(' ')[0];
       const timePart = str.split(' ')[1] || '00:00:00';
-      const [dd, mm, yyyy] = datePart.split('-');
+      const sep = datePart.includes('/') ? '/' : '-';
+      const [dd, mm, yyyy] = datePart.split(sep);
       date = new Date(`${yyyy}-${mm}-${dd}T${timePart}`);
     } else {
       date = new Date(d);
