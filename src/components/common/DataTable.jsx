@@ -5,9 +5,9 @@ import {
   TextField, InputAdornment, Stack, Menu, MenuItem, Checkbox,
   FormControlLabel, Typography, Skeleton, alpha, useTheme, useMediaQuery,
 } from '@mui/material';
-import SearchIcon       from '@mui/icons-material/Search';
-import ViewColumnIcon   from '@mui/icons-material/ViewColumn';
-import TableRowsIcon    from '@mui/icons-material/TableRows';
+import SearchIcon from '@mui/icons-material/Search';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import TableRowsIcon from '@mui/icons-material/TableRows';
 import { statusColor } from '../../utils/formatters';
 import { useData } from '../../contexts/DataContext';
 
@@ -46,7 +46,7 @@ function ToolBtn({ title, onClick, children, color }) {
 function MobileCard({ row, idx, page, rowsPerPage, visibleColumns, actions, theme }) {
   const isDark = theme.palette.mode === 'dark';
   const statusCol = visibleColumns.find(c => c.type === 'status');
-  const otherCols  = visibleColumns.filter(c => c.type !== 'status');
+  const otherCols = visibleColumns.filter(c => c.type !== 'status');
 
   const renderCellValue = (col, row) => {
     if (col.render) return col.render(row[col.key], row);
@@ -123,8 +123,8 @@ export default function DataTable({
   hideIndexColumn = false,
   hideActionsColumn = false,
 }) {
-  const theme    = useTheme();
-  const isDark   = theme.palette.mode === 'dark';
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   let dataLoading = false;
   try {
     const dataCtx = useData();
@@ -137,12 +137,12 @@ export default function DataTable({
   const isLoading = loading !== undefined ? loading : dataLoading;
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const [order, setOrder]               = useState('asc');
-  const [orderBy, setOrderBy]           = useState('');
-  const [page, setPage]                 = useState(0);
-  const [rowsPerPage, setRowsPerPage]   = useState(10);
-  const [search, setSearch]             = useState('');
-  const [visibleCols, setVisibleCols]   = useState(() => new Set(columns.map((c) => c.key)));
+  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [search, setSearch] = useState('');
+  const [visibleCols, setVisibleCols] = useState(() => new Set(columns.map((c) => c.key)));
   const [colMenuAnchor, setColMenuAnchor] = useState(null);
   const prevColKeysRef = useRef(columns.map((c) => c.key).join(','));
 
@@ -178,9 +178,9 @@ export default function DataTable({
     return data;
   }, [rows, search, searchKey, order, orderBy]);
 
-  const paginated      = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const visibleColumns = columns.filter((c) => visibleCols.has(c.key));
-  const exportCols     = visibleColumns.map((c) => ({ key: c.key, header: c.label }));
+  const exportCols = visibleColumns.map((c) => ({ key: c.key, header: c.label }));
 
   const handleSort = (key) => {
     setOrder(orderBy === key && order === 'asc' ? 'desc' : 'asc');
@@ -393,7 +393,7 @@ export default function DataTable({
                     )}
 
                     {visibleColumns.map((col) => (
-                      <TableCell key={col.key} sx={{ py: rowPy, px: 2, maxWidth: col.maxWidth || 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: col.wrap ? 'normal' : 'nowrap' }}>
+                      <TableCell key={col.key} sx={{ py: rowPy, px: 2, maxWidth: col.wrap ? (col.maxWidth || 260) : (col.maxWidth || 220), overflow: col.wrap ? 'visible' : 'hidden', textOverflow: col.wrap ? 'clip' : 'ellipsis', whiteSpace: col.wrap ? 'normal' : 'nowrap', wordBreak: col.wrap ? 'break-word' : 'normal' }}>
                         {col.render ? (
                           col.render(row[col.key], row)
                         ) : col.type === 'status' ? (
@@ -403,7 +403,7 @@ export default function DataTable({
                             ₹{Number(row[col.key] || 0).toLocaleString('en-IN')}
                           </Typography>
                         ) : (
-                          <Typography variant="body2" color="text.primary">{String(row[col.key] ?? '')}</Typography>
+                          <Typography variant="body2" color="text.primary" sx={{ wordBreak: col.wrap ? 'break-word' : 'normal', whiteSpace: col.wrap ? 'normal' : 'nowrap' }}>{String(row[col.key] ?? '')}</Typography>
                         )}
                       </TableCell>
                     ))}

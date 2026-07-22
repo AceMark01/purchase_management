@@ -34,8 +34,8 @@ export const groupByPO = (records) => {
 export const PO_COLUMNS = [
   { key: 'poNumber', label: 'PO Number', minWidth: 190, render: (v) => v || '—' },
   { key: 'poDate', label: 'PO Date', minWidth: 110, render: (v) => v || '—' },
-  { key: 'partyName', label: 'Vendor', minWidth: 180 },
-  { key: 'companyName', label: 'Company', minWidth: 160 },
+  { key: 'partyName', label: 'Vendor', minWidth: 180, wrap: true },
+  { key: 'companyName', label: 'Company', minWidth: 160, wrap: true },
   {
     key: '_itemCount',
     label: 'Items',
