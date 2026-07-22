@@ -27,7 +27,7 @@ export default function PageHeader({ title, subtitle, actions }) {
 
       {/* Right — action slot */}
       {actions && (
-        <Stack direction="row" spacing={1} sx={{ flexShrink: 0, flexWrap: 'wrap' }}>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ flexShrink: 0, flexWrap: 'wrap' }}>
           {actions}
         </Stack>
       )}

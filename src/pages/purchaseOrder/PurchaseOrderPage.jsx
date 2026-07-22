@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useData } from '../../contexts/DataContext';
-import { Box, Button, Chip, Link } from '@mui/material';
+import { Box, Button, Chip, Link, Stack } from '@mui/material';
 import { ViewBtn } from '../../components/common/ActionButtons';
-import DescriptionIcon from '@mui/icons-material/Description';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import GeneratePOForm from '../../components/po/GeneratePOForm';
 import { toast } from 'react-toastify';
@@ -157,26 +158,64 @@ export default function PurchaseOrderPage() {
         subtitle={`${filtered.length} records found`}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Purchase Order' }]}
         actions={
-          <Box display="flex" gap={1}>
+          <>
             {tabValue === 0 && (
               <Button
                 variant="contained"
-                color="secondary"
-                startIcon={<DescriptionIcon />}
+                startIcon={<PostAddIcon sx={{ fontSize: 19 }} />}
                 onClick={handleOpenGenerate}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  textTransform: 'none',
+                  borderRadius: '12px',
+                  px: 2.25,
+                  py: 0.85,
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)',
+                    boxShadow: '0 6px 20px rgba(124, 58, 237, 0.5)',
+                    transform: 'translateY(-2px)',
+                  },
+                  '&:active': {
+                    transform: 'translateY(0)',
+                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+                  },
+                }}
               >
                 Generate PO
               </Button>
             )}
             <Button
               variant="contained"
-              color="primary"
-              startIcon={<DescriptionIcon />}
+              startIcon={<EditNoteIcon sx={{ fontSize: 20 }} />}
               onClick={handleOpenRevise}
+              sx={{
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                textTransform: 'none',
+                borderRadius: '12px',
+                px: 2.25,
+                py: 0.85,
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)',
+                  transform: 'translateY(-2px)',
+                },
+                '&:active': {
+                  transform: 'translateY(0)',
+                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                },
+              }}
             >
               Revise PO
             </Button>
-          </Box>
+          </>
         }
       />
 
@@ -199,8 +238,8 @@ export default function PurchaseOrderPage() {
       />
 
       {generatePOOpen && (
-        <GeneratePOForm 
-          open={generatePOOpen} 
+        <GeneratePOForm
+          open={generatePOOpen}
           selectedRowIds={selectedRowIds}
           onClose={() => {
             setGeneratePOOpen(false);
