@@ -53,16 +53,23 @@ export default function ReceiveMaterialForm({ open, onClose, record, groupIds })
     if (open && record) {
       const ids = groupIds?.length ? groupIds : [record.id];
       const matched = allRecords.filter(r => ids.includes(r.id));
-      setProductRows(matched.map(r => ({
-        id: r.id,
-        groupName: r.groupName || '',
-        itemName: r.itemName || '',
-        unit: r.unit || '',
-        quantity: r.quantity || 0,
-        maxQuantity: r.quantity || 0,
-        qualityCondition: 'Good',
-        originalRecord: r
-      })));
+      setProductRows(matched.map(r => {
+        const maxQty = Number(
+          (r.liftingQty !== undefined && r.liftingQty !== null && r.liftingQty !== '' && Number(r.liftingQty) > 0)
+            ? r.liftingQty
+            : (r.totalLifted || r.quantity || 0)
+        );
+        return {
+          id: r.id,
+          groupName: r.groupName || '',
+          itemName: r.itemName || '',
+          unit: r.unit || '',
+          quantity: maxQty,
+          maxQuantity: maxQty,
+          qualityCondition: 'Good',
+          originalRecord: r
+        };
+      }));
 
       setValue('billNo', '');
       setValue('billImage', null);

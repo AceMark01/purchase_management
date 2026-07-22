@@ -490,35 +490,51 @@ export function DataProvider({ children }) {
         return isNaN(num) ? 0 : num;
       };
 
-      const mappedPoHistory = poHistory.map((row, idx) => ({
-        id: row._row || (idx + 1),
-        _row: row._row,
-        timestamp: row["Timestamp"] || "",
-        partyName: row["Party Name"] || "",
-        poNumber: row["Po Number"] || "",
-        productCode: row["Product Code"] || "",
-        product: row["Product"] || "",
-        description: row["Description"] || "",
-        quantity: parseNum(row["Quntity"]),
-        unit: row["Unit"] || "",
-        rate: parseNum(row["Rate"]),
-        discount: parseNum(row["Discount%"]),
-        gst: parseNum(row["Gst %"]),
-        amount: parseNum(row["Amount"]),
-        totalAmount: parseNum(row["Total Amount"]),
-        poCopy: row["PO Copy"] || "",
-        indentNumber: row["Indent No."] || "",
-        serialNo: parseNum(row["Serial No."]),
-        companyName: row["Company Name"] || "",
-        
-        // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
-        itemName: row["Product"] || "",
-        itemCode: row["Product Code"] || "",
-        groupName: row["Description"] || "",
-        status: row["Actual"] ? "Completed" : "Pending",
-        createdDate: row["Timestamp"] || "",
-        orderBy: ""
-      }));
+      const mappedPoHistory = poHistory.map((row, idx) => {
+        const poNo = row["Po Number"] || "";
+        const indentNo = row["Indent No."] || "";
+        const matchedRec = mappedRecords.find(r => 
+          (indentNo && String(r.indentNumber).toLowerCase() === String(indentNo).toLowerCase()) || 
+          (poNo && r.poNumber && String(r.poNumber).toLowerCase() === String(poNo).toLowerCase())
+        );
+
+        const totalLifted = matchedRec?.totalLifted || 0;
+        const pendingLifting = matchedRec?.pendingLifting ?? Math.max(0, (matchedRec?.poQty || matchedRec?.quantity || parseNum(row["Quntity"])) - totalLifted);
+
+        return {
+          id: row._row || (idx + 1),
+          _row: row._row,
+          timestamp: row["Timestamp"] || "",
+          partyName: row["Party Name"] || matchedRec?.partyName || "",
+          poNumber: poNo,
+          productCode: row["Product Code"] || "",
+          product: row["Product"] || "",
+          description: row["Description"] || "",
+          quantity: parseNum(row["Quntity"]),
+          poQty: matchedRec?.poQty || parseNum(row["Quntity"]) || 0,
+          totalLifted: totalLifted,
+          pendingLifting: pendingLifting,
+          unit: row["Unit"] || matchedRec?.unit || "",
+          rate: parseNum(row["Rate"]),
+          discount: parseNum(row["Discount%"]),
+          gst: parseNum(row["Gst %"]),
+          amount: parseNum(row["Amount"]),
+          totalAmount: parseNum(row["Total Amount"]),
+          poCopy: row["PO Copy"] || "",
+          indentNumber: indentNo,
+          serialNo: parseNum(row["Serial No."]),
+          companyName: row["Company Name"] || matchedRec?.companyName || "",
+          
+          // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
+          itemName: row["Product"] || matchedRec?.itemName || "",
+          itemCode: row["Product Code"] || "",
+          groupName: row["Description"] || "",
+          status: row["Actual"] ? "Completed" : "Pending",
+          createdDate: row["Timestamp"] || "",
+          orderBy: ""
+        };
+      });
+
       // Map INDENT-PO records for PO page pending consumption
       const mappedIndents = indents.map((row, idx) => {
         const qty = parseNum(row["Quantity"] || row["Quntity"]);
@@ -535,6 +551,15 @@ export function DataProvider({ children }) {
         const planned1 = row["Planned1"] || row[plannedKey] || "";
         const actual1 = row["Actual1"] || row[actualKey] || "";
 
+        let totalLifted = 0;
+        let pendingLifting = 0;
+        if (row._rawRow) {
+          totalLifted = parseNum(row._rawRow[51]);
+          pendingLifting = parseNum(row._rawRow[52]);
+        }
+        if (!totalLifted && row["Total Lifted"]) totalLifted = parseNum(row["Total Lifted"]);
+        if (!pendingLifting && row["Pending Lifting"]) pendingLifting = parseNum(row["Pending Lifting"]);
+
         return {
           id: row._row || (idx + 1),
           _row: row._row,
@@ -548,6 +573,8 @@ export function DataProvider({ children }) {
           itemCode: row["Item code"] || row["Item Code"] || row["Product Code"] || "",
           description: row["Discription"] || row["Description"] || "",
           quantity: qty,
+          totalLifted: totalLifted,
+          pendingLifting: pendingLifting || qty,
           unit: row["Unit"] || "",
           rate: rate,
           gst: gst,

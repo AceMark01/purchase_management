@@ -286,6 +286,42 @@ export default function DashboardPage() {
                 }
               },
               {
+                key: 'totalLifted',
+                label: 'TOTAL LIFTING',
+                render: (v, r) => {
+                  let val = v ?? r.totalLifted;
+                  if ((val === undefined || val === null) && records && r.indentNumber) {
+                    const matched = records.find(m => String(m.indentNumber).toLowerCase() === String(r.indentNumber).toLowerCase());
+                    if (matched) val = matched.totalLifted;
+                  }
+                  return `${val || 0} ${r.unit || 'Nos'}`;
+                }
+              },
+              {
+                key: 'pendingLifting',
+                label: 'PENDING QTY',
+                render: (v, r) => {
+                  let totalLifted = r.totalLifted;
+                  let pendingLifting = v ?? r.pendingLifting;
+                  if ((pendingLifting === undefined || pendingLifting === null || totalLifted === undefined) && records && r.indentNumber) {
+                    const matched = records.find(m => String(m.indentNumber).toLowerCase() === String(r.indentNumber).toLowerCase());
+                    if (matched) {
+                      totalLifted = matched.totalLifted;
+                      pendingLifting = matched.pendingLifting;
+                    }
+                  }
+                  const val = pendingLifting ?? Math.max(0, (r.poQty || r.quantity || 0) - (totalLifted || 0));
+                  return (
+                    <Chip
+                      label={`${val} ${r.unit || 'Nos'}`}
+                      size="small"
+                      color={val > 0 ? 'warning' : 'success'}
+                      sx={{ fontWeight: 700, height: 20, fontSize: '0.65rem' }}
+                    />
+                  );
+                }
+              },
+              {
                 key: 'poAmount',
                 label: 'PO Amount',
                 render: (_, r) => {

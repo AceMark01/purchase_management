@@ -181,11 +181,16 @@ export function mapWorkflowRecords(
     if (indentNo) followUpsMap[indentNo] = row;
   });
 
-  // 4. Logistics indexed by Indent No.
+  // 4. Logistics indexed by Indent No. (supporting multiple lift submissions per indent)
+  const logisticsByIndentMap = {};
   const logisticsMap = {};
   logisticsRows.forEach(row => {
     const indentNo = normalizeIndentNumber(row["Indent No."]);
-    if (indentNo) logisticsMap[indentNo] = row;
+    if (indentNo) {
+      if (!logisticsByIndentMap[indentNo]) logisticsByIndentMap[indentNo] = [];
+      logisticsByIndentMap[indentNo].push(row);
+      logisticsMap[indentNo] = row; // latest
+    }
   });
 
   // 5. Receiving indexed by Lift No. (supporting multiple rows per LN)
@@ -236,6 +241,14 @@ export function mapWorkflowRecords(
     }) || receiveList[0] || null;
 
     const quantity = parseNum(row["Quantity"]);
+    let poQty = 0;
+    if (row._rawRow) {
+      poQty = parseNum(row._rawRow[20]);
+    }
+    if (!poQty && row["PO Qty"]) {
+      poQty = parseNum(row["PO Qty"]);
+    }
+
     const rate = parseNum(row["Rate"]);
     const gst = parseNum(row["GST %"] || row["GST"]);
     const discount = parseNum(row["Discount Amount"] || row["Discount"]);
@@ -257,6 +270,7 @@ export function mapWorkflowRecords(
       itemCode: row["Item code"] || row["Item Code"] || "",
       description: row["Discription"] || row["Description"] || "",
       quantity,
+      poQty: poQty || quantity,
       unit: row["Unit"] || "",
       rate,
       gst,
@@ -286,7 +300,7 @@ export function mapWorkflowRecords(
     // PO Generate Stage
     if (poNo) {
       baseRecord.workflowStage.purchaseOrder = 'Completed';
-      baseRecord.poQty = parseNum(row["PO Qty"]);
+      baseRecord.poQty = poQty || parseNum(row["PO Qty"]) || quantity;
       baseRecord.poRate = parseNum(row["Rate 1"] || row["Rate 1 "]);
       baseRecord.poCopy = poHistoryMap[poNoLower] || row["PO Copy"] || null;
     }
@@ -386,10 +400,14 @@ export function mapWorkflowRecords(
     let planned3 = "";
     let actual3 = "";
     let timeDelay3 = "";
+    let totalLifted = 0;
+    let pendingLifting = 0;
     if (row._rawRow) {
       planned3 = row._rawRow[48] || "";
       actual3 = row._rawRow[49] || "";
       timeDelay3 = row._rawRow[50] || "";
+      totalLifted = parseNum(row._rawRow[51]);
+      pendingLifting = parseNum(row._rawRow[52]);
     }
     for (const key in row) {
       if (key === "_rawRow") continue;
@@ -400,15 +418,48 @@ export function mapWorkflowRecords(
         actual3 = row[key] || actual3;
       } else if (normalizedKey === "timedelay3") {
         timeDelay3 = row[key] || timeDelay3;
+      } else if (normalizedKey === "totallifted") {
+        totalLifted = parseNum(row[key]) || totalLifted;
+      } else if (normalizedKey === "pendinglifting") {
+        pendingLifting = parseNum(row[key]) || pendingLifting;
       }
+    }
+
+    // Attach all lift rows for this indent
+    const indentLiftsRaw = logisticsByIndentMap[indentNoNorm] || [];
+    const lifts = indentLiftsRaw.map(l => ({
+      liftNo: l["LN-Lift Number"] || l["LN-Lift Number "] || "",
+      transporterName: l["Transporter Name"] || "",
+      vehicleNo: l["Vehicle No."] || "",
+      driverNo: l["Driver No."] || "",
+      biltyNo: l["Bilty No."] || "",
+      biltyImage: l["Bilty Image"] || null,
+      transportingAmount: parseNum(l["Transporting Amount"]),
+      partyAddress: l["Party Address"] || "",
+      locationLink: l["Party Location Link"] || "",
+      liftingQty: parseNum(l["Lifting Qty"]),
+      date: formatDateString(l["Timestamp"]),
+      _row: l._row
+    }));
+    baseRecord.lifts = lifts;
+
+    // Fallback if sheet formula hasn't updated yet or on initial load
+    const totalFromLifts = lifts.reduce((sum, l) => sum + (l.liftingQty || 0), 0);
+    if (totalLifted === 0 && totalFromLifts > 0) {
+      totalLifted = totalFromLifts;
+    }
+    if (pendingLifting === 0 && totalLifted < quantity) {
+      pendingLifting = Math.max(0, quantity - totalLifted);
     }
 
     baseRecord.planned3 = planned3;
     baseRecord.actual3 = actual3;
     baseRecord.timeDelay3 = timeDelay3;
+    baseRecord.totalLifted = totalLifted;
+    baseRecord.pendingLifting = pendingLifting;
 
     if (planned3 && String(planned3).trim() !== "") {
-      if (!actual3 || String(actual3).trim() === "") {
+      if (pendingLifting > 0 || (totalLifted === 0 && (!actual3 || String(actual3).trim() === ""))) {
         baseRecord.workflowStage.logistics = 'Pending';
       } else {
         baseRecord.workflowStage.logistics = 'Completed';
@@ -416,7 +467,9 @@ export function mapWorkflowRecords(
     }
 
     if (logistic) {
-      if (baseRecord.workflowStage.logistics !== 'Pending') {
+      if (pendingLifting > 0) {
+        baseRecord.workflowStage.logistics = 'Pending';
+      } else {
         baseRecord.workflowStage.logistics = 'Completed';
       }
 
@@ -461,6 +514,7 @@ export function mapWorkflowRecords(
       baseRecord.transportingAmount = parseNum(logistic["Transporting Amount"]);
       baseRecord.partyAddress = logistic["Party Address"] || "";
       baseRecord.locationLink = logistic["Party Location Link"] || "";
+      baseRecord.liftingQty = parseNum(logistic["Lifting Qty"]);
       baseRecord._logisticsRow = logistic._row;
     }
 

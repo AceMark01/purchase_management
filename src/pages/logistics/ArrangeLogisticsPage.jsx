@@ -37,18 +37,48 @@ export default function ArrangeLogisticsPage() {
   const [poViewRecord,   setPoViewRecord]   = useState(null);
 
   const stageRecords = useMemo(() => {
-    const recs = tabValue === 0
-      ? records.filter(r => r.workflowStage.logistics === 'Pending')
-      : records.filter(r => r.workflowStage.logistics === 'Completed');
-    return groupByPO(recs);
+    if (tabValue === 0) {
+      const recs = records.filter(r => r.workflowStage?.logistics === 'Pending' || (r.pendingLifting && r.pendingLifting > 0));
+      return groupByPO(recs);
+    } else {
+      const historyRows = [];
+      records.forEach((r) => {
+        if (r.lifts && r.lifts.length > 0) {
+          r.lifts.forEach((lift, lIdx) => {
+            historyRows.push({
+              ...r,
+              id: `${r.id}_lift_${lIdx}`,
+              liftNo: lift.liftNo || r.liftNo || '—',
+              liftingQty: lift.liftingQty || r.liftingQty || 0,
+              transporterName: lift.transporterName || r.transporterName || '—',
+              vehicleNo: lift.vehicleNo || r.vehicleNo || '—',
+              driverNo: lift.driverNo || r.driverNo || '—',
+              biltyNo: lift.biltyNo || r.biltyNo || '—',
+              biltyImage: lift.biltyImage || r.biltyImage,
+              transportingAmount: lift.transportingAmount || r.transportingAmount,
+              partyAddress: lift.partyAddress || r.partyAddress,
+              locationLink: lift.locationLink || r.locationLink,
+              liftDate: lift.date || r.createdDate,
+            });
+          });
+        } else if (r.liftNo || r.workflowStage?.logistics === 'Completed' || (r.totalLifted && r.totalLifted > 0)) {
+          historyRows.push({
+            ...r,
+            liftingQty: r.liftingQty || r.totalLifted || r.quantity || 0,
+            liftDate: r.createdDate,
+          });
+        }
+      });
+      return historyRows;
+    }
   }, [records, tabValue]);
 
   const filtered = useMemo(() =>
     stageRecords.filter((i) => {
       const f = appliedFilters;
       return (
-        (!f.partyName   || i.partyName.toLowerCase().includes(f.partyName.toLowerCase()))     &&
-        (!f.companyName || i.companyName.toLowerCase().includes(f.companyName.toLowerCase())) &&
+        (!f.partyName   || i.partyName?.toLowerCase().includes(f.partyName.toLowerCase()))     &&
+        (!f.companyName || i.companyName?.toLowerCase().includes(f.companyName.toLowerCase())) &&
         (!f.status      || i.status === f.status)                                             &&
         (!f.dateFrom    || i.createdDate >= f.dateFrom)                                       &&
         (!f.dateTo      || i.createdDate <= f.dateTo)
@@ -93,13 +123,81 @@ export default function ArrangeLogisticsPage() {
     render: (v) => v || '—'
   }), []);
 
+  const totalQtyCol = useMemo(() => ({
+    key: '_totalQty',
+    label: 'Total PO Qty',
+    minWidth: 120,
+    render: (_v, r) => r._totalQty || r.poQty || r.quantity || 0
+  }), []);
+
+  const liftingQtyCol = useMemo(() => ({
+    key: 'liftingQty',
+    label: 'Lifting Qty',
+    minWidth: 120,
+    render: (v, r) => (
+      <Chip label={v || r.totalLifted || r.poQty || r.quantity || 0} size="small" color="info" sx={{ fontWeight: 700, fontSize: '0.75rem' }} />
+    )
+  }), []);
+
+  const totalLiftedCol = useMemo(() => ({
+    key: '_totalLifted',
+    label: 'Total Lifted',
+    minWidth: 120,
+    render: (_v, r) => r._totalLifted ?? r.totalLifted ?? 0
+  }), []);
+
+  const pendingLiftingCol = useMemo(() => ({
+    key: '_pendingLifting',
+    label: 'Pending Lifting',
+    minWidth: 130,
+    render: (_v, r) => {
+      const val = r._pendingLifting ?? r.pendingLifting ?? Math.max(0, (r._totalQty || r.poQty || r.quantity || 0) - (r._totalLifted || r.totalLifted || 0));
+      return (
+        <Chip 
+          label={val} 
+          size="small" 
+          color={val > 0 ? 'warning' : 'success'} 
+          sx={{ fontWeight: 700, fontSize: '0.75rem' }} 
+        />
+      );
+    }
+  }), []);
+
+  const transportingAmountCol = useMemo(() => ({
+    key: 'transportingAmount',
+    label: 'Transporting Amount',
+    minWidth: 160,
+    render: (v) => v ? `₹ ${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
+  }), []);
+
   const pendingCols = useMemo(() => {
-    return [indentCol, serialCol, ...getHistoryCols(handleViewPO)];
-  }, [handleViewPO, indentCol, serialCol]);
+    return [
+      indentCol,
+      serialCol,
+      ...getHistoryCols(handleViewPO).slice(0, 4), // PO Number, PO Date, Vendor, Company
+      totalQtyCol,
+      totalLiftedCol,
+      pendingLiftingCol,
+      ...getHistoryCols(handleViewPO).slice(4)
+    ];
+  }, [handleViewPO, indentCol, serialCol, totalQtyCol, totalLiftedCol, pendingLiftingCol]);
 
   const historyCols = useMemo(() => {
-    return [indentCol, liftCol, ...getHistoryCols(handleViewPO)];
-  }, [handleViewPO, indentCol, liftCol]);
+    const baseCols = getHistoryCols(handleViewPO).filter(c => c.key !== '_totalAmount');
+    return [
+      liftCol,
+      indentCol,
+      ...baseCols.slice(0, 4), // PO Number, PO Date, Vendor, Company
+      liftingQtyCol,
+      totalLiftedCol,
+      pendingLiftingCol,
+      { key: 'transporterName', label: 'Transporter Name', minWidth: 150 },
+      { key: 'vehicleNo', label: 'Vehicle No.', minWidth: 130 },
+      { key: 'biltyNo', label: 'Bilty No.', minWidth: 120 },
+      transportingAmountCol,
+      ...baseCols.slice(4)
+    ];
+  }, [handleViewPO, indentCol, liftCol, liftingQtyCol, totalLiftedCol, pendingLiftingCol, transportingAmountCol]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {

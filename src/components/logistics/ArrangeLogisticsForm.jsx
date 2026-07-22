@@ -28,8 +28,21 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
   const [biltyFile, setBiltyFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const totalPOQty = record ? Number(record._totalQty || record.poQty || record.quantity || 0) : 0;
+
+  const maxPending = record ? (
+    record._pendingLifting !== undefined && record._pendingLifting !== null && record._pendingLifting > 0
+      ? Number(record._pendingLifting)
+      : (record.pendingLifting !== undefined && record.pendingLifting !== null && record.pendingLifting > 0
+          ? Number(record.pendingLifting)
+          : Math.max(0, totalPOQty - Number(record._totalLifted || record.totalLifted || 0)))
+  ) : 0;
+
+  const availablePending = maxPending > 0 ? maxPending : totalPOQty;
+
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
     defaultValues: {
+      liftingQty: '',
       transporterName: '',
       partyAddress: '',
       locationLink: '',
@@ -45,6 +58,13 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
 
   useEffect(() => {
     if (open && record) {
+      const pendingVal = record._pendingLifting !== undefined && record._pendingLifting !== null && record._pendingLifting > 0
+        ? Number(record._pendingLifting)
+        : (record.pendingLifting !== undefined && record.pendingLifting !== null && record.pendingLifting > 0
+            ? Number(record.pendingLifting)
+            : Math.max(0, Number(record._totalQty || record.poQty || record.quantity || 0) - Number(record._totalLifted || record.totalLifted || 0)));
+
+      setValue('liftingQty', pendingVal > 0 ? pendingVal : (record._totalQty || record.poQty || record.quantity || ''));
       setValue('partyAddress', record.partyAddress || '');
       setValue('locationLink', record.locationLink || '');
       setValue('transporterName', '');
@@ -115,7 +135,12 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
         "Bilty Image",
         "Transporting Amount",
         "Party Address",
-        "Party Location Link"
+        "Party Location Link",
+        "Planned 1",
+        "Actual 1",
+        "Time Delay 1",
+        "Serial Number",
+        "Lifting Qty"
       ];
 
       const timestamp = formatTimestamp();
@@ -135,6 +160,11 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
           "Transporting Amount": Number(data.transportingAmount) || 0,
           "Party Address": data.partyAddress,
           "Party Location Link": data.locationLink,
+          "Planned 1": "",
+          "Actual 1": "",
+          "Time Delay 1": "",
+          "Serial Number": rec.serialNo || "",
+          "Lifting Qty": Number(data.liftingQty) || 0,
         };
         return headersList.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
       });
@@ -187,6 +217,28 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
           <SectionLabel>Logistics Details</SectionLabel>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <Grid container spacing={2.5}>
+              <Grid item xs={12}>
+                <Box sx={{ p: 1.2, px: 2, borderRadius: 2, bgcolor: 'primary.50', border: '1px dashed', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="primary.main" fontWeight={600}>
+                    Total PO Qty: <strong>{record?._totalQty || record?.quantity || 0}</strong> &nbsp;|&nbsp; Total Lifted: <strong>{record?._totalLifted || record?.totalLifted || 0}</strong> &nbsp;|&nbsp; Remaining Pending: <strong>{availablePending}</strong>
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={4}>
+                <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+                  Lifting Qty <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField fullWidth size="small" type="number"
+                  placeholder={`Max ${availablePending}`}
+                  {...register('liftingQty', {
+                    required: 'Required',
+                    min: { value: 1, message: 'Min 1' },
+                    max: { value: availablePending, message: `Max ${availablePending}` }
+                  })}
+                  error={!!errors.liftingQty} helperText={errors.liftingQty ? errors.liftingQty.message : `Max pending: ${availablePending}`} />
+              </Grid>
+
               <Grid item xs={4}>
                 <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
                   Transporter Name <span style={{ color: 'red' }}>*</span>
