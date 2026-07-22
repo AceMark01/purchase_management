@@ -21,7 +21,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 function MiniTable({ columns, rows, emptyLabel = 'No records' }) {
   return (
     <TableContainer sx={{ maxHeight: 350, width: '100%' }}>
-      <Table size="small" stickyHeader sx={{ width: '100%', tableLayout: 'fixed' }}>
+      <Table size="small" stickyHeader sx={{ width: '100%' }}>
         <TableHead>
           <TableRow>
             {columns.map((c) => (
@@ -58,10 +58,8 @@ function MiniTable({ columns, rows, emptyLabel = 'No records' }) {
                     sx={{
                       py: '10px',
                       fontSize: '0.78rem',
-                      maxWidth: 200,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
                       borderBottom: 1,
                       borderColor: 'action.hover'
                     }}
@@ -81,7 +79,7 @@ function MiniTable({ columns, rows, emptyLabel = 'No records' }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { loading, pendingPoRecords = [], poHistoryRecords = [] } = useData();
+  const { loading, pendingPoRecords = [], poHistoryRecords = [], receiving = [] } = useData();
 
   const records = useSelector((s) => s.workflow.records) || [];
   const [poTab, setPoTab] = useState(0); // 0 = Pending, 1 = Completed
@@ -270,9 +268,22 @@ export default function DashboardPage() {
                 render: (v, r) => `${v || r.quantity || 0} ${r.unit || 'Nos'}`
               },
               {
-                key: 'quantity',
-                label: 'Item QTY (Indent)',
-                render: (v, r) => `${v || 0} ${r.unit || 'Nos'}`
+                key: 'totalReceiving',
+                label: 'TOTAL RECEIVING',
+                render: (_, r) => {
+                  let totalReceived = r.receivedQuantity || 0;
+                  if (!totalReceived && receiving && receiving.length > 0 && r.indentNumber) {
+                    const rowIndentNorm = String(r.indentNumber || "").trim().toLowerCase();
+                    const matched = receiving.filter(rec => {
+                      const recIndent = String(rec["Indent No."] || rec["Indent Number"] || "").trim().toLowerCase();
+                      return recIndent === rowIndentNorm;
+                    });
+                    if (matched.length > 0) {
+                      totalReceived = matched.reduce((acc, curr) => acc + (parseFloat(curr["Qty"]) || 0), 0);
+                    }
+                  }
+                  return `${totalReceived} ${r.unit || 'Nos'}`;
+                }
               },
               {
                 key: 'poAmount',
