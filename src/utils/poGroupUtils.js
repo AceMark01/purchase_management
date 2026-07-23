@@ -15,6 +15,9 @@ export const groupByPO = (records) => {
         _totalQty: parseFloat(r.poQty || r.quantity) || 0,
         _totalLifted: parseFloat(r.totalLifted) || 0,
         _pendingLifting: parseFloat(r.pendingLifting) || 0,
+        _liftingQty: parseFloat(r.liftingQty) || 0,
+        _receivedQuantity: parseFloat(r.receivedQuantity) || 0,
+        _billImage: r.billImage || r.receiptImage || null,
         _indentNumbers: r.indentNumber ? [r.indentNumber] : [],
         _serialNos: (r.serialNo !== undefined && r.serialNo !== null && r.serialNo !== '') ? [r.serialNo] : [],
         _lifts: r.lifts || [],
@@ -26,6 +29,11 @@ export const groupByPO = (records) => {
       groups[key]._totalQty += parseFloat(r.poQty || r.quantity) || 0;
       groups[key]._totalLifted += parseFloat(r.totalLifted) || 0;
       groups[key]._pendingLifting += parseFloat(r.pendingLifting) || 0;
+      groups[key]._liftingQty += parseFloat(r.liftingQty) || 0;
+      groups[key]._receivedQuantity += parseFloat(r.receivedQuantity) || 0;
+      if (!groups[key]._billImage && (r.billImage || r.receiptImage)) {
+        groups[key]._billImage = r.billImage || r.receiptImage;
+      }
       if (r.indentNumber && !groups[key]._indentNumbers.includes(r.indentNumber)) {
         groups[key]._indentNumbers.push(r.indentNumber);
       }

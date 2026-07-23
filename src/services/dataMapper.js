@@ -220,6 +220,7 @@ export function mapWorkflowRecords(
     const id = row["Indent Number"] || row["Indent No."] || row["Indent No"] || row["Request ID"];
     return id && String(id).trim() !== "";
   });
+  const receiveProductIndexMap = {};
   const mappedRecords = indentsRowsFiltered.map((row, idx) => {
     const indentNoRaw = row["Indent Number"] || row["Indent No."] || row["Indent No"] || row["Request ID"] || "";
     const indentNo = String(indentNoRaw).trim();
@@ -231,17 +232,35 @@ export function mapWorkflowRecords(
     const approval = poNo ? approvalsMap[poNoLower] : null;
     const poSent = poNo ? poSentMap[poNoLower] : null;
     const followUp = followUpsMap[indentNoNorm];
-    const logistic = logisticsMap[indentNoNorm];
+    const rawLifts = logisticsByIndentMap[indentNoNorm] || [];
+    const serialNoStr = String(row["Serial No."] || "").trim();
+
+    const logistic = rawLifts.find(l => {
+      const s = l["Serial Number"];
+      if (s !== undefined && s !== null && String(s).trim() !== '') {
+        return String(s).trim() === serialNoStr;
+      }
+      return true;
+    }) || logisticsMap[indentNoNorm];
 
     const logisticLiftNo = (logistic && (logistic["LN-Lift Number"] || logistic["LN-Lift Number "] || ""))
       ? String(logistic["LN-Lift Number"] || logistic["LN-Lift Number "]).trim().toLowerCase()
       : "";
     const receiveList = logisticLiftNo ? (receivingMap[logisticLiftNo] || []) : [];
-    const receive = receiveList.find(r => {
-      const receiveProd = String(r["Product Name"] || "").trim().toLowerCase();
-      const indentProd = String(row["Item Name"] || "").trim().toLowerCase();
-      return receiveProd === indentProd;
-    }) || receiveList[0] || null;
+    const indentProd = String(row["Item Name"] || "").trim().toLowerCase();
+
+    const prodKey = `${logisticLiftNo}_${indentProd}`;
+    const sameProductCount = receiveProductIndexMap[prodKey] || 0;
+    receiveProductIndexMap[prodKey] = sameProductCount + 1;
+
+    const matchingProductReceives = receiveList.filter(r =>
+      String(r["Product Name"] || "").trim().toLowerCase() === indentProd
+    );
+
+    const receive = matchingProductReceives[sameProductCount] ||
+      matchingProductReceives[0] ||
+      (receiveList[sameProductCount] || receiveList[0]) ||
+      null;
 
     const quantity = parseNum(row["Quantity"]);
     let poQty = 0;
@@ -442,8 +461,16 @@ export function mapWorkflowRecords(
       }
     }
 
-    // Attach all lift rows for this indent
-    const indentLiftsRaw = logisticsByIndentMap[indentNoNorm] || [];
+    // Attach all lift rows for this indent (matching by Serial Number if present)
+    const rawLiftsForIndent = logisticsByIndentMap[indentNoNorm] || [];
+    const indentLiftsRaw = rawLiftsForIndent.filter(l => {
+      const liftSerial = l["Serial Number"];
+      if (liftSerial !== undefined && liftSerial !== null && String(liftSerial).trim() !== '') {
+        return String(liftSerial).trim() === String(baseRecord.serialNo || '').trim();
+      }
+      return true;
+    });
+
     const lifts = indentLiftsRaw.map(l => ({
       liftNo: l["LN-Lift Number"] || l["LN-Lift Number "] || "",
       transporterName: l["Transporter Name"] || "",
@@ -549,6 +576,7 @@ export function mapWorkflowRecords(
       baseRecord.billNo = receive["Bill No."] || "";
       baseRecord.qualityRemarks = receive["Quality Check"] || "";
       baseRecord.receiptImage = receive["Bill Image"] || null;
+      baseRecord.billImage = receive["Bill Image"] || receive["Bill Image "] || null;
       baseRecord.grnNo = receive["GRN No."] || "";
 
       // Lift Receiver columns (Planned 2 = Q, Actual 2 = R)

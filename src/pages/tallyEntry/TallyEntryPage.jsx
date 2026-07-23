@@ -12,74 +12,104 @@ import GeneratePOForm         from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 import { formatDate } from '../../utils/formatters';
 
-const getHistoryCols = (onViewPO) => [
-  ...PO_COLUMNS,
-  { key: 'tallyPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
-  { key: 'tallyActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
-  { 
-    key: 'tallyTimeDelay', 
-    label: 'TIME DELAY', 
-    minWidth: 110,
-    render: (_v, row) => {
-      if (!row.tallyPlanned || !row.tallyActual) return '00:00:00';
-      const pTime = new Date(row.tallyPlanned);
-      const aTime = new Date(row.tallyActual);
-      if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
-      const diffMs = Math.abs(aTime - pTime);
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-      const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-      const ss = String(totalSeconds % 60).padStart(2, '0');
-      return `${hh}:${mm}:${ss}`;
-    }
-  },
-  {
-    key: 'biltyAttach',
-    label: 'Bilty Attach',
-    minWidth: 110,
-    render: (_v, row) => row.biltyAttach ? (
-      <Link href={row.biltyAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
-        View Bilty
-      </Link>
-    ) : '—',
-  },
-  {
-    key: 'invoiceAttach',
-    label: 'Invoice Attach',
-    minWidth: 120,
-    render: (_v, row) => row.invoiceAttach ? (
-      <Link href={row.invoiceAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
-        View Invoice
-      </Link>
-    ) : '—',
-  },
-  {
-    key: 'poViewLink',
-    label: 'PO Document',
-    minWidth: 120,
-    render: (_v, row) => row.poNumber ? (
-      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
-        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
-        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
-      </Link>
-    ) : '—',
-  },
-];
+const quantityCol = {
+  key: 'receivedQuantity',
+  label: 'QUANTITY',
+  minWidth: 120,
+  render: (_v, r) => {
+    const qty = r._receivedQuantity || r.receivedQuantity || r.quantity || 0;
+    return `${qty} ${r.unit || ''}`.trim();
+  }
+};
 
-const getPendingCols = (onViewPO) => [
-  ...PO_COLUMNS,
-  {
-    key: 'poViewLink',
-    label: 'PO Document',
-    minWidth: 120,
-    render: (_v, row) => row.poNumber ? (
-      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
-        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
-        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
-      </Link>
-    ) : '—',
-  },
-];
+const getHistoryCols = (onViewPO) => {
+  const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+  return [
+    poNoCol,
+    poDateCol,
+    vendorCol,
+    companyCol,
+    itemsCol,
+    quantityCol,
+    amountCol,
+    dateCol,
+    { key: 'tallyPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
+    { key: 'tallyActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
+    { 
+      key: 'tallyTimeDelay', 
+      label: 'TIME DELAY', 
+      minWidth: 110,
+      render: (_v, row) => {
+        if (!row.tallyPlanned || !row.tallyActual) return '00:00:00';
+        const pTime = new Date(row.tallyPlanned);
+        const aTime = new Date(row.tallyActual);
+        if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
+        const diffMs = Math.abs(aTime - pTime);
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+        const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+        const ss = String(totalSeconds % 60).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+    },
+    {
+      key: 'biltyAttach',
+      label: 'Bilty Attach',
+      minWidth: 110,
+      render: (_v, row) => row.biltyAttach ? (
+        <Link href={row.biltyAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+          View Bilty
+        </Link>
+      ) : '—',
+    },
+    {
+      key: 'invoiceAttach',
+      label: 'Invoice Attach',
+      minWidth: 120,
+      render: (_v, row) => row.invoiceAttach ? (
+        <Link href={row.invoiceAttach} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+          View Invoice
+        </Link>
+      ) : '—',
+    },
+    {
+      key: 'poViewLink',
+      label: 'PO Document',
+      minWidth: 120,
+      render: (_v, row) => row.poNumber ? (
+        <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+          <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+        </Link>
+      ) : '—',
+    },
+  ];
+};
+
+const getPendingCols = (onViewPO) => {
+  const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+  return [
+    poNoCol,
+    poDateCol,
+    vendorCol,
+    companyCol,
+    itemsCol,
+    quantityCol,
+    amountCol,
+    dateCol,
+    {
+      key: 'poViewLink',
+      label: 'PO Document',
+      minWidth: 120,
+      render: (_v, row) => row.poNumber ? (
+        <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+          <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+        </Link>
+      ) : '—',
+    },
+  ];
+};
 
 export default function TallyEntryPage() {
   const records = useSelector((s) => s.workflow.records);
@@ -133,9 +163,13 @@ export default function TallyEntryPage() {
       );
     }), [stageRecords, appliedFilters]);
 
-  const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
-  const historyCols  = useMemo(() => getHistoryCols(handleViewPO), []);
-  const pendingCols  = useMemo(() => getPendingCols(handleViewPO), []);
+  const handleViewPO = useCallback((row) => {
+    setPoViewRecord(row);
+    setPoViewOpen(true);
+  }, []);
+
+  const historyCols = useMemo(() => getHistoryCols(handleViewPO), [handleViewPO]);
+  const pendingCols = useMemo(() => getPendingCols(handleViewPO), [handleViewPO]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {

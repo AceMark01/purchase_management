@@ -244,6 +244,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       replace(poGroup.map((item, idx) => ({
         sno: idx + 1,
         indentNumber: item.indentNumber || '',
+        serialNo: item.serialNo,
         itemCode: item.itemCode || '',
         groupName: item.groupName || '',
         description: item.itemName || '',
@@ -335,6 +336,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     replace(matchedIndents.map((ind, idx) => ({
       sno: idx + 1,
       indentNumber: ind.indentNumber || '',
+      serialNo: ind.serialNo,
       itemCode: ind.itemCode || '',
       groupName: ind.groupName || '',
       description: ind.itemName || '',
@@ -481,11 +483,13 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
         // 1. Submit the new PO records to PO-History (Columns A-R)
         const historyRows = [];
-        for (const indent of matchedIndents) {
-          const matchedFormItem = data.items?.find(
-            it => it.indentNumber === indent.indentNumber &&
-              it.itemCode === indent.itemCode
-          );
+        matchedIndents.forEach((indent, idx) => {
+          const matchedFormItem =
+            data.items?.find(
+              it => it.indentNumber === indent.indentNumber &&
+                (it.serialNo !== undefined && it.serialNo !== null ? String(it.serialNo) === String(indent.serialNo) : false)
+            ) || (data.items && data.items[idx]);
+
           const poQty = matchedFormItem ? parseFloat(matchedFormItem.quantity) : indent.quantity;
           const poRate = matchedFormItem ? parseFloat(matchedFormItem.rate) : indent.rate;
           const poDiscount = matchedFormItem ? parseFloat(matchedFormItem.discount) : indent.discount;
@@ -515,7 +519,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             data.companyName || "",      // Company Name (Q)
             data.dispatchDate || ""      // Dispatch Date (R)
           ]);
-        }
+        });
 
         await gasApi.batchInsert("PO-History", historyRows);
 

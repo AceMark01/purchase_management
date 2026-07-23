@@ -26,6 +26,45 @@ const getHistoryCols = (onViewPO) => [
   },
 ];
 
+const groupHistoryRows = (flatHistoryRows) => {
+  const groups = {};
+  flatHistoryRows.forEach((row) => {
+    const liftKey = row.liftNo && row.liftNo !== '—' ? `${row.liftNo}_${row.poNumber || row.id}` : `_solo_${row.id}`;
+    const totLiftedVal = parseFloat(row.totalLifted) || 0;
+    const pendLiftVal = row._pendingLifting !== undefined && row._pendingLifting !== null
+      ? parseFloat(row._pendingLifting)
+      : (row.pendingLifting !== undefined && row.pendingLifting !== null ? parseFloat(row.pendingLifting) : 0);
+
+    if (!groups[liftKey]) {
+      groups[liftKey] = {
+        ...row,
+        _groupIds: [row.id],
+        _itemCount: 1,
+        _totalQty: parseFloat(row.poQty || row.quantity) || 0,
+        liftingQty: parseFloat(row.liftingQty) || 0,
+        _totalLifted: totLiftedVal,
+        _pendingLifting: pendLiftVal,
+        _indentNumbers: row.indentNumber ? [row.indentNumber] : [],
+        _serialNos: (row.serialNo !== undefined && row.serialNo !== null && row.serialNo !== '') ? [row.serialNo] : [],
+      };
+    } else {
+      groups[liftKey]._groupIds.push(row.id);
+      groups[liftKey]._itemCount += 1;
+      groups[liftKey]._totalQty += parseFloat(row.poQty || row.quantity) || 0;
+      groups[liftKey].liftingQty += parseFloat(row.liftingQty) || 0;
+      groups[liftKey]._totalLifted += totLiftedVal;
+      groups[liftKey]._pendingLifting += pendLiftVal;
+      if (row.indentNumber && !groups[liftKey]._indentNumbers.includes(row.indentNumber)) {
+        groups[liftKey]._indentNumbers.push(row.indentNumber);
+      }
+      if (row.serialNo !== undefined && row.serialNo !== null && row.serialNo !== '' && !groups[liftKey]._serialNos.includes(row.serialNo)) {
+        groups[liftKey]._serialNos.push(row.serialNo);
+      }
+    }
+  });
+  return Object.values(groups);
+};
+
 export default function ArrangeLogisticsPage() {
   const records = useSelector((s) => s.workflow.records);
 
@@ -69,7 +108,7 @@ export default function ArrangeLogisticsPage() {
           });
         }
       });
-      return historyRows;
+      return groupHistoryRows(historyRows);
     }
   }, [records, tabValue]);
 

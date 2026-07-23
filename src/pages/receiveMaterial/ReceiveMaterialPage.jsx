@@ -18,22 +18,6 @@ const liftNoCol = {
   render: (v) => v || '—'
 };
 
-const getHistoryCols = (onViewPO) => [
-  liftNoCol,
-  ...PO_COLUMNS,
-  {
-    key: 'poViewLink',
-    label: 'PO Document',
-    minWidth: 120,
-    render: (_v, row) => row.poNumber ? (
-      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
-        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
-        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
-      </Link>
-    ) : '—',
-  },
-];
-
 export default function ReceiveMaterialPage() {
   const records = useSelector((s) => s.workflow.records);
 
@@ -66,8 +50,94 @@ export default function ReceiveMaterialPage() {
       );
     }), [stageRecords, appliedFilters]);
 
-  const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
-  const historyCols  = useMemo(() => getHistoryCols(handleViewPO), []);
+  const handleViewPO = useCallback((row) => {
+    setPoViewRecord(row);
+    setPoViewOpen(true);
+  }, []);
+
+  const poDocCol = useMemo(() => ({
+    key: 'poViewLink',
+    label: 'PO Document',
+    minWidth: 120,
+    render: (_v, row) => row.poNumber ? (
+      <Link component="button" onClick={() => handleViewPO(row)} underline="hover"
+        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+      </Link>
+    ) : '—',
+  }), [handleViewPO]);
+
+  const pendingCols = useMemo(() => {
+    const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+    return [
+      liftNoCol,
+      poNoCol,
+      poDateCol,
+      vendorCol,
+      companyCol,
+      itemsCol,
+      {
+        key: 'pendingLiftingQty',
+        label: 'QUANTITY',
+        minWidth: 120,
+        render: (_v, r) => {
+          const qty = r._liftingQty || r.liftingQty || r.totalLifted || 0;
+          return `${qty} ${r.unit || ''}`.trim();
+        }
+      },
+      amountCol,
+      dateCol,
+      poDocCol,
+    ];
+  }, [poDocCol]);
+
+  const historyCols = useMemo(() => {
+    const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+    return [
+      liftNoCol,
+      poNoCol,
+      poDateCol,
+      vendorCol,
+      companyCol,
+      itemsCol,
+      {
+        key: 'receivedQuantity',
+        label: 'RECEIVED QUANTITY',
+        minWidth: 160,
+        render: (_v, r) => {
+          const qty = r._receivedQuantity || r.receivedQuantity || r._liftingQty || r.liftingQty || r._totalQty || r.quantity || 0;
+          return `${qty} ${r.unit || ''}`.trim();
+        }
+      },
+      amountCol,
+      dateCol,
+      {
+        key: 'billImage',
+        label: 'BILL IMAGE',
+        minWidth: 120,
+        render: (v, row) => {
+          const imgUrl = v || row._billImage || row.billImage || row.receiptImage;
+          if (!imgUrl) return '—';
+          let targetUrl = String(imgUrl).trim();
+          if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+            targetUrl = `https://drive.google.com/open?id=${targetUrl}`;
+          }
+          return (
+            <Link
+              href={targetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}
+            >
+              <OpenInNewIcon sx={{ fontSize: 13 }} /> View
+            </Link>
+          );
+        }
+      },
+      poDocCol,
+    ];
+  }, [poDocCol]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {
@@ -94,7 +164,7 @@ export default function ReceiveMaterialPage() {
       <WorkflowFilters appliedFilters={appliedFilters} onApply={setAppliedFilters} onReset={() => setAppliedFilters(defaultFilters)} />
 
       <DataTable
-        columns={historyCols}
+        columns={tabValue === 0 ? pendingCols : historyCols}
         rows={filtered}
         title={tabValue === 0 ? 'Pending Receive' : 'Receive History'}
         searchKey={['poNumber', 'partyName', 'companyName']}

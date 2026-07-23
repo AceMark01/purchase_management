@@ -12,65 +12,95 @@ import GeneratePOForm         from '../../components/po/GeneratePOForm';
 import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 import { formatDate } from '../../utils/formatters';
 
-const getHistoryCols = (onViewPO) => [
-  ...PO_COLUMNS,
-  { key: 'liftPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
-  { key: 'liftActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
-  { 
-    key: 'liftTimeDelay', 
-    label: 'TIME DELAY', 
-    minWidth: 110,
-    render: (_v, row) => {
-      if (!row.liftPlanned || !row.liftActual) return '00:00:00';
-      const pTime = new Date(row.liftPlanned);
-      const aTime = new Date(row.liftActual);
-      if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
-      const diffMs = Math.abs(aTime - pTime);
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-      const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-      const ss = String(totalSeconds % 60).padStart(2, '0');
-      return `${hh}:${mm}:${ss}`;
-    }
-  },
-  {
-    key: 'liftedImage',
-    label: 'Lifted Image',
-    minWidth: 120,
-    render: (_v, row) => row.liftedImage ? (
-      <Link href={row.liftedImage} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
-        View Image
-      </Link>
-    ) : '—',
-  },
-  {
-    key: 'poViewLink',
-    label: 'PO Document',
-    minWidth: 120,
-    render: (_v, row) => row.poNumber ? (
-      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
-        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
-        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
-      </Link>
-    ) : '—',
-  },
-  { key: 'liftRemarks', label: 'Remarks', minWidth: 180 },
-];
+const quantityCol = {
+  key: 'receivedQuantity',
+  label: 'QUANTITY',
+  minWidth: 120,
+  render: (_v, r) => {
+    const qty = r._receivedQuantity || r.receivedQuantity || r.quantity || 0;
+    return `${qty} ${r.unit || ''}`.trim();
+  }
+};
 
-const getPendingCols = (onViewPO) => [
-  ...PO_COLUMNS,
-  {
-    key: 'poViewLink',
-    label: 'PO Document',
-    minWidth: 120,
-    render: (_v, row) => row.poNumber ? (
-      <Link component="button" onClick={() => onViewPO(row)} underline="hover"
-        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
-        <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
-      </Link>
-    ) : '—',
-  },
-];
+const getHistoryCols = (onViewPO) => {
+  const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+  return [
+    poNoCol,
+    poDateCol,
+    vendorCol,
+    companyCol,
+    itemsCol,
+    quantityCol,
+    amountCol,
+    dateCol,
+    { key: 'liftPlanned', label: 'PLANNED', minWidth: 155, render: (v) => formatDate(v) },
+    { key: 'liftActual', label: 'ACTUAL', minWidth: 155, render: (v) => formatDate(v) },
+    { 
+      key: 'liftTimeDelay', 
+      label: 'TIME DELAY', 
+      minWidth: 110,
+      render: (_v, row) => {
+        if (!row.liftPlanned || !row.liftActual) return '00:00:00';
+        const pTime = new Date(row.liftPlanned);
+        const aTime = new Date(row.liftActual);
+        if (isNaN(pTime.getTime()) || isNaN(aTime.getTime())) return '00:00:00';
+        const diffMs = Math.abs(aTime - pTime);
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+        const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+        const ss = String(totalSeconds % 60).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+    },
+    {
+      key: 'liftedImage',
+      label: 'Lifted Image',
+      minWidth: 120,
+      render: (_v, row) => row.liftedImage ? (
+        <Link href={row.liftedImage} target="_blank" underline="hover" sx={{ fontWeight: 600 }}>
+          View Image
+        </Link>
+      ) : '—',
+    },
+    {
+      key: 'poViewLink',
+      label: 'PO Document',
+      minWidth: 120,
+      render: (_v, row) => row.poNumber ? (
+        <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+          <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+        </Link>
+      ) : '—',
+    },
+    { key: 'liftRemarks', label: 'Remarks', minWidth: 180 },
+  ];
+};
+
+const getPendingCols = (onViewPO) => {
+  const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol] = PO_COLUMNS;
+  return [
+    poNoCol,
+    poDateCol,
+    vendorCol,
+    companyCol,
+    itemsCol,
+    quantityCol,
+    amountCol,
+    dateCol,
+    {
+      key: 'poViewLink',
+      label: 'PO Document',
+      minWidth: 120,
+      render: (_v, row) => row.poNumber ? (
+        <Link component="button" onClick={() => onViewPO(row)} underline="hover"
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}>
+          <OpenInNewIcon sx={{ fontSize: 13 }} /> View PO
+        </Link>
+      ) : '—',
+    },
+  ];
+};
 
 export default function LiftReceiverPage() {
   const records = useSelector((s) => s.workflow.records);
@@ -108,9 +138,13 @@ export default function LiftReceiverPage() {
       );
     }), [stageRecords, appliedFilters]);
 
-  const handleViewPO = (row) => { setPoViewRecord(row); setPoViewOpen(true); };
-  const historyCols  = useMemo(() => getHistoryCols(handleViewPO), []);
-  const pendingCols  = useMemo(() => getPendingCols(handleViewPO), []);
+  const handleViewPO = useCallback((row) => {
+    setPoViewRecord(row);
+    setPoViewOpen(true);
+  }, []);
+
+  const historyCols = useMemo(() => getHistoryCols(handleViewPO), [handleViewPO]);
+  const pendingCols = useMemo(() => getPendingCols(handleViewPO), [handleViewPO]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {

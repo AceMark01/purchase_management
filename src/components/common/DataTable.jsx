@@ -295,7 +295,7 @@ export default function DataTable({
 
       {/* ── Desktop: Table View ── */}
       {!isMobile && (
-        <TableContainer sx={{ flex: 1, maxHeight: 520, overflowX: 'auto' }}>
+        <TableContainer sx={{ flex: 1, maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }}>
           <Table stickyHeader size={density === 'compact' ? 'small' : 'medium'} sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow>
