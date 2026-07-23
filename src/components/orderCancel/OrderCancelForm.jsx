@@ -191,7 +191,7 @@ export default function OrderCancelForm({ open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
+    <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth PaperProps={{ sx: { borderRadius: 2.5, maxWidth: '1380px' } }}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1.5, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CancelIcon color="error" />
@@ -256,7 +256,7 @@ export default function OrderCancelForm({ open, onClose }) {
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, bgcolor: 'background.paper' }}>Received Qty</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, bgcolor: 'background.paper' }}>Pending Qty</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, bgcolor: 'background.paper' }}>Canceled Qty</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, bgcolor: 'background.paper', minWidth: 110 }}>Cancel Qty *</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', py: 1, px: 1.5, bgcolor: 'background.paper', width: 100 }}>Cancel Qty *</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -315,7 +315,7 @@ export default function OrderCancelForm({ open, onClose }) {
                       <TableCell sx={{ py: 0.75, px: 1.5, fontSize: '0.78rem' }}>
                         {totalCanceledQty} {r.unit || ''}
                       </TableCell>
-                      <TableCell sx={{ py: 0.75, px: 1 }}>
+                      <TableCell sx={{ py: 0.75, px: 1, width: 100 }}>
                         <TextField
                           size="small"
                           type="number"
@@ -325,9 +325,9 @@ export default function OrderCancelForm({ open, onClose }) {
                           inputProps={{
                             min: 1,
                             max: pendingQty,
-                            style: { padding: '5px 6px', fontSize: '0.82rem', fontWeight: 600, width: 75 }
+                            style: { padding: '5px 8px', fontSize: '0.82rem', fontWeight: 600, textAlign: 'center' }
                           }}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
+                          sx={{ width: 85, '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
                         />
                       </TableCell>
                     </TableRow>

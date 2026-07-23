@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { Box, Button, Link } from '@mui/material';
+import { Box, Button, Link, Chip } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import DataTable from '../../components/common/DataTable';
 import WorkflowFilters, { defaultFilters } from '../../components/common/WorkflowFilters';
@@ -61,7 +61,40 @@ export default function FollowUpPage() {
   const handleCloseForm = () => { setFormOpen(false); setSelectedRow(null); };
   const handleViewPO = useCallback((row) => { setPoViewRecord(row); setPoViewOpen(true); }, []);
 
-  const columns = useMemo(() => getColumns(handleViewPO), [handleViewPO]);
+  const indentCol = useMemo(() => ({
+    key: 'indentNumber',
+    label: 'Indent Number',
+    minWidth: 150,
+    render: (_v, row) => {
+      const vals = row._indentNumbers || (row.indentNumber ? [row.indentNumber] : []);
+      if (!vals.length) return '—';
+      return vals.map(num => (
+        <Chip
+          key={num}
+          label={num}
+          size="small"
+          color="primary"
+          sx={{ fontWeight: 700, fontSize: '0.7rem', height: 20, mr: 0.5, mb: 0.5 }}
+        />
+      ));
+    }
+  }), []);
+
+  const serialCol = useMemo(() => ({
+    key: 'serialNo',
+    label: 'Serial No.',
+    minWidth: 100,
+    render: (_v, row) => {
+      const vals = row._serialNos || (row.serialNo !== undefined && row.serialNo !== null && row.serialNo !== '' ? [row.serialNo] : []);
+      return vals.length ? vals.join(', ') : '—';
+    }
+  }), []);
+
+  const columns = useMemo(() => {
+    const cols = getColumns(handleViewPO);
+    cols.splice(2, 0, indentCol, serialCol);
+    return cols;
+  }, [handleViewPO, indentCol, serialCol]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {

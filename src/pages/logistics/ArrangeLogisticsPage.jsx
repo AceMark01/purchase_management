@@ -38,7 +38,7 @@ export default function ArrangeLogisticsPage() {
 
   const stageRecords = useMemo(() => {
     if (tabValue === 0) {
-      const recs = records.filter(r => r.workflowStage?.logistics === 'Pending' || (r.pendingLifting && r.pendingLifting > 0));
+      const recs = records.filter(r => r.workflowStage?.logistics === 'Pending');
       return groupByPO(recs);
     } else {
       const historyRows = [];
@@ -170,34 +170,74 @@ export default function ArrangeLogisticsPage() {
     render: (v) => v ? `₹ ${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
   }), []);
 
+  const biltyImageCol = useMemo(() => ({
+    key: 'biltyImage',
+    label: 'Bilty Image',
+    minWidth: 120,
+    render: (v, row) => {
+      const imgUrl = v || row.biltyImage;
+      if (!imgUrl) return '—';
+      let targetUrl = String(imgUrl).trim();
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = `https://drive.google.com/open?id=${targetUrl}`;
+      }
+      return (
+        <Link
+          href={targetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          underline="hover"
+          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem', color: 'primary.main', fontWeight: 600 }}
+        >
+          <OpenInNewIcon sx={{ fontSize: 13 }} /> View
+        </Link>
+      );
+    }
+  }), []);
+
   const pendingCols = useMemo(() => {
+    const historyColsList = getHistoryCols(handleViewPO);
+    const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, amountCol, dateCol, poDocCol] = historyColsList;
     return [
       indentCol,
       serialCol,
-      ...getHistoryCols(handleViewPO).slice(0, 4), // PO Number, PO Date, Vendor, Company
+      poNoCol,
+      poDateCol,
+      vendorCol,
+      companyCol,
       totalQtyCol,
       totalLiftedCol,
       pendingLiftingCol,
-      ...getHistoryCols(handleViewPO).slice(4)
+      itemsCol,
+      amountCol,
+      dateCol,
+      poDocCol,
     ];
   }, [handleViewPO, indentCol, serialCol, totalQtyCol, totalLiftedCol, pendingLiftingCol]);
 
   const historyCols = useMemo(() => {
-    const baseCols = getHistoryCols(handleViewPO).filter(c => c.key !== '_totalAmount');
+    const historyColsList = getHistoryCols(handleViewPO);
+    const [poNoCol, poDateCol, vendorCol, companyCol, itemsCol, _dupPendingCol, _amountCol, dateCol, poDocCol] = historyColsList;
     return [
       liftCol,
       indentCol,
-      ...baseCols.slice(0, 4), // PO Number, PO Date, Vendor, Company
+      poNoCol,
+      poDateCol,
+      vendorCol,
+      companyCol,
       liftingQtyCol,
       totalLiftedCol,
       pendingLiftingCol,
       { key: 'transporterName', label: 'Transporter Name', minWidth: 150 },
       { key: 'vehicleNo', label: 'Vehicle No.', minWidth: 130 },
       { key: 'biltyNo', label: 'Bilty No.', minWidth: 120 },
+      biltyImageCol,
       transportingAmountCol,
-      ...baseCols.slice(4)
+      itemsCol,
+      dateCol,
+      poDocCol,
     ];
-  }, [handleViewPO, indentCol, liftCol, liftingQtyCol, totalLiftedCol, pendingLiftingCol, transportingAmountCol]);
+  }, [handleViewPO, indentCol, liftCol, liftingQtyCol, totalLiftedCol, pendingLiftingCol, biltyImageCol, transportingAmountCol]);
 
   const actions = useCallback((row) => {
     if (tabValue === 0) {

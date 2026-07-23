@@ -205,10 +205,13 @@ export function mapWorkflowRecords(
 
   // 6. PO History indexed by PO Number
   const poHistoryMap = {};
+  const poDispatchMap = {};
   poHistoryRows.forEach(row => {
     const poNum = String(row["Po Number"] || "").trim().toLowerCase();
-    if (poNum && row["PO Copy"]) {
-      poHistoryMap[poNum] = row["PO Copy"];
+    if (poNum) {
+      if (row["PO Copy"]) poHistoryMap[poNum] = row["PO Copy"];
+      const dispatchVal = row["Dispatch Date"] || row["dispatchDate"] || row["Dispatch date"] || row["DISPATCH DATE"] || "";
+      if (dispatchVal) poDispatchMap[poNum] = dispatchVal;
     }
   });
 
@@ -281,6 +284,7 @@ export function mapWorkflowRecords(
       image: row["Image"] || null,
       poNumber: poNo || null,
       poDate: row["Timestamp"] ? formatDateString(row["Timestamp"]) : "", // default PO date
+      dispatchDate: poNoLower ? (poDispatchMap[poNoLower] || "") : "",
       status: 'In Progress', // default
 
       // Stage tracking states
@@ -303,6 +307,9 @@ export function mapWorkflowRecords(
       baseRecord.poQty = poQty || parseNum(row["PO Qty"]) || quantity;
       baseRecord.poRate = parseNum(row["Rate 1"] || row["Rate 1 "]);
       baseRecord.poCopy = poHistoryMap[poNoLower] || row["PO Copy"] || null;
+      if (!baseRecord.dispatchDate && poDispatchMap[poNoLower]) {
+        baseRecord.dispatchDate = poDispatchMap[poNoLower];
+      }
     }
 
     // PO Approval Stage
@@ -403,6 +410,7 @@ export function mapWorkflowRecords(
     let totalLifted = 0;
     let pendingLifting = 0;
     let totalCanceledQty = 0;
+    let isPendingQtyFromSheet = false;
     if (row._rawRow) {
       planned3 = row._rawRow[48] || "";
       actual3 = row._rawRow[49] || "";
@@ -410,6 +418,7 @@ export function mapWorkflowRecords(
       totalLifted = parseNum(row._rawRow[24]);
       pendingLifting = parseNum(row._rawRow[26]);
       totalCanceledQty = parseNum(row._rawRow[25]);
+      isPendingQtyFromSheet = row._rawRow[26] !== undefined && row._rawRow[26] !== null && String(row._rawRow[26]).trim() !== '';
     }
     for (const key in row) {
       if (key === "_rawRow") continue;
@@ -423,7 +432,11 @@ export function mapWorkflowRecords(
       } else if (normalizedKey === "totallifted" || normalizedKey === "totalreceiving") {
         totalLifted = parseNum(row[key]) || totalLifted;
       } else if (normalizedKey === "pendinglifting" || normalizedKey === "pendingqty") {
-        pendingLifting = parseNum(row[key]) || pendingLifting;
+        const parsedVal = parseNum(row[key]);
+        if (parsedVal !== 0 || (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '')) {
+          isPendingQtyFromSheet = true;
+          pendingLifting = parsedVal;
+        }
       } else if (normalizedKey === "cancelqty" || normalizedKey === "totalcanceledqty") {
         totalCanceledQty = parseNum(row[key]) || totalCanceledQty;
       }
@@ -452,7 +465,7 @@ export function mapWorkflowRecords(
     if (totalLifted === 0 && totalFromLifts > 0) {
       totalLifted = totalFromLifts;
     }
-    if (pendingLifting === 0 && totalLifted < quantity) {
+    if (!isPendingQtyFromSheet && pendingLifting === 0 && totalLifted < quantity && (String(planned3).trim() !== "" || lifts.length > 0)) {
       pendingLifting = Math.max(0, quantity - totalLifted);
     }
 
@@ -648,7 +661,7 @@ export function mapWorkflowRecords(
         delivery: 'Within 2-3 Weeks from PO date',
         transport: 'By Vendor',
         paymentTerms: '30 Days credit',
-        dispatchDate: rec.expectedArrivalDate || "",
+        dispatchDate: rec.dispatchDate || rec.expectedArrivalDate || "",
         items: group.map((item, idx) => ({
           sno: idx + 1,
           indentNumber: item.indentNumber,

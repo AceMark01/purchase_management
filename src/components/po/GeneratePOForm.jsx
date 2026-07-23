@@ -17,10 +17,19 @@ import { generatePoPdfBlob } from './pdf-generate';
 const generatePONumber = () => `ACE/PO/25-26-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
 const formatToIsoDate = (val) => {
-  if (!val) return new Date().toISOString().slice(0, 10);
+  if (!val) return '';
   const str = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
   }
   const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
   if (dmyMatch) {
@@ -32,10 +41,13 @@ const formatToIsoDate = (val) => {
   try {
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
-      return d.toISOString().slice(0, 10);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
   } catch (e) {}
-  return new Date().toISOString().slice(0, 10);
+  return '';
 };
 
 // Transparent input used inside the printable PO template
@@ -207,7 +219,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
       setValue('poNumber', viewRecord.poNumber || '');
       setValue('poDate', formatToIsoDate(viewRecord.poDate || viewRecord.timestamp || (poGroup[0] && (poGroup[0].poDate || poGroup[0].timestamp))));
-      const rawDispatchDate = viewRecord.dispatchDate || viewRecord.expectedArrivalDate || (poGroup[0] && (poGroup[0].dispatchDate || poGroup[0].expectedArrivalDate)) || viewRecord.timestamp || viewRecord.poDate;
+      const historyDispatch = poGroup.find(r => r.dispatchDate && String(r.dispatchDate).trim() !== '')?.dispatchDate;
+      const rawDispatchDate = historyDispatch || viewRecord.dispatchDate || viewRecord.expectedArrivalDate || '';
       setValue('dispatchDate', formatToIsoDate(rawDispatchDate));
       setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
@@ -244,7 +257,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       // Fallback for older records without poDetails
       setValue('poNumber', viewRecord.poNumber || '');
       setValue('poDate', formatToIsoDate(viewRecord.poDate || viewRecord.timestamp));
-      const rawDispatchDate = viewRecord.dispatchDate || viewRecord.expectedArrivalDate || viewRecord.poDate || viewRecord.timestamp;
+      const rawDispatchDate = viewRecord.dispatchDate || viewRecord.expectedArrivalDate || viewRecord.poDate || '';
       setValue('dispatchDate', formatToIsoDate(rawDispatchDate));
       setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
@@ -438,6 +451,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           // Column N (14): Amount
           // Column O (15): Total Amount
           // Column P (16): PO Copy
+          // Column R (18): Dispatch Date
           cells.push({ rowIndex: item._row, columnIndex: 9, value: poQty });
           cells.push({ rowIndex: item._row, columnIndex: 11, value: poRate });
           cells.push({ rowIndex: item._row, columnIndex: 12, value: poDiscount });
@@ -445,6 +459,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
           cells.push({ rowIndex: item._row, columnIndex: 14, value: discounted });
           cells.push({ rowIndex: item._row, columnIndex: 15, value: total });
           cells.push({ rowIndex: item._row, columnIndex: 16, value: fileUrl });
+          cells.push({ rowIndex: item._row, columnIndex: 18, value: data.dispatchDate || "" });
         }
 
         if (cells.length > 0) {
@@ -497,7 +512,8 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
             discounted,                  // Amount (N)
             total,                       // Total Amount (O)
             fileUrl,                     // PO Copy (P)
-            data.companyName || ""       // Company Name (Q)
+            data.companyName || "",      // Company Name (Q)
+            data.dispatchDate || ""      // Dispatch Date (R)
           ]);
         }
 
@@ -505,11 +521,13 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
 
         toast.success(`Purchase Order ${data.poNumber} generated and saved to Drive!`);
         onClose();
-        refresh(['indents', 'poHistory'], false)
-          .catch(err => console.error("Background refresh failed:", err))
-          .finally(() => {
-            if (endSync) endSync();
-          });
+        setTimeout(() => {
+          refresh(['indents', 'poHistory'], false)
+            .catch(err => console.error("Background refresh failed:", err))
+            .finally(() => {
+              if (endSync) endSync();
+            });
+        }, 800);
       }
     } catch (err) {
       console.error("Failed to process PO:", err);
@@ -652,7 +670,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Typography variant="caption" fontWeight={700} sx={{ width: '60px' }}>PO Date : </Typography>
-                <TransparentInput type="date" {...register('poDate')} readOnly={true} />
+                <TransparentInput type={isViewMode ? 'text' : 'date'} {...register('poDate')} readOnly={true} />
               </Box>
             </Box>
           </Box>
@@ -756,7 +774,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
               <p>3</p><p>Delivery :</p><TransparentInput {...register('delivery')} readOnly={isViewMode} />
               <p>4</p><p>Transport :</p><TransparentInput {...register('transport')} readOnly={isViewMode} />
               <p>5</p><p>Payment :</p><TransparentInput {...register('paymentTerms')} readOnly={isViewMode} />
-              <p>6</p><p>Dispatch Date :</p><TransparentInput type="date" {...register('dispatchDate')} readOnly={isViewMode} />
+              <p>6</p><p>Dispatch Date :</p><TransparentInput type={isViewMode ? 'text' : 'date'} {...register('dispatchDate')} readOnly={isViewMode} />
             </Box>
             <Typography variant="caption" fontWeight={700} sx={{ display: 'block', p: 1, mt: 1 }}>
               Kindly Acknowledge Receipt Of This Purchase Order Along With Its Enclosures, And Ensure Timely Execution Of The Ordered Material.

@@ -17,7 +17,7 @@ export const WORKFLOW_COLUMNS = [
   { key: 'gst', label: 'GST %', minWidth: 80, render: (v) => `${v}%` },
   { key: 'discount', label: 'Discount', minWidth: 100, render: (v) => `${v}%` },
   { key: 'amount', label: 'Amount', type: 'currency', minWidth: 120 },
-  { key: 'image', label: 'Image', minWidth: 100, render: (v) => v ? 'Yes' : 'No' },
+  { key: 'image', label: 'Image', minWidth: 100, render: (v) => v ? <a href={v} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'underline' }}>View</a> : '—' },
   { key: 'leadDays', label: 'Approx. Lead Days', minWidth: 150 },
   { key: 'companyName', label: 'Company Name', minWidth: 180, wrap: true },
   { key: 'status', label: 'Status', type: 'status', minWidth: 130 },

@@ -531,6 +531,7 @@ export function DataProvider({ children }) {
           indentNumber: indentNo,
           serialNo: parseNum(row["Serial No."]),
           companyName: row["Company Name"] || matchedRec?.companyName || "",
+          dispatchDate: row["Dispatch Date"] || row["dispatchDate"] || row["Dispatch date"] || row["DISPATCH DATE"] || "",
           
           // Compatibility fields with WORKFLOW_COLUMNS in PurchaseOrderPage DataTable
           itemName: row["Product"] || matchedRec?.itemName || "",

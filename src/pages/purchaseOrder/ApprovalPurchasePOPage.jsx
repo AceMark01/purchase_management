@@ -21,6 +21,26 @@ import { groupByPO, PO_COLUMNS } from '../../utils/poGroupUtils';
 const getHistoryCols = (onViewPO) => [
   ...PO_COLUMNS,
   {
+    key: 'approvalStatus',
+    label: 'DECISION',
+    minWidth: 120,
+    render: (v) => {
+      const val = v || '—';
+      let color = 'default';
+      if (val === 'Approved') color = 'success';
+      else if (val === 'Rejected') color = 'error';
+      return (
+        <Chip
+          label={val}
+          size="small"
+          color={color}
+          variant="outlined"
+          sx={{ fontWeight: 700, fontSize: '0.72rem' }}
+        />
+      );
+    },
+  },
+  {
     key: 'approvalRemarks',
     label: 'Remarks',
     minWidth: 200,
@@ -155,7 +175,7 @@ const getHistoryCols = (onViewPO) => [
   const pendingCols = useMemo(() => {
     const cols = getHistoryCols(handleViewPO);
     cols.splice(2, 0, indentCol, serialCol);
-    return cols;
+    return cols.filter(c => c.key !== 'approvalRemarks' && c.key !== 'approvalStatus');
   }, [handleViewPO, indentCol, serialCol]);
 
   const historyCols = useMemo(() => {
