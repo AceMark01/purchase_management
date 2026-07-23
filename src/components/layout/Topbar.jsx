@@ -32,6 +32,7 @@ const PAGE_TITLES = {
   '/receive-material': { label: 'Receive Material',       sub: 'Record material receipts' },
   '/lift-receiver':    { label: 'Lift Receiver Material', sub: 'Manage received material storage' },
   '/tally-entry':      { label: 'Tally Entry',            sub: 'Financial voucher entries' },
+  '/order-cancel':     { label: 'Order Cancel',           sub: 'Manage cancelled orders & indents' },
   '/settings':         { label: 'Settings',               sub: 'Manage system users & roles' },
   '/reports':          { label: 'Reports & Analytics',    sub: 'Business intelligence' },
   '/master':           { label: 'Company Master',         sub: 'Manage company records' },

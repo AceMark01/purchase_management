@@ -67,7 +67,8 @@ export const gasApi = {
       { key: "vendorsData", name: "Master-Vendors" },
       { key: "productsData", name: "Master-Products" },
       { key: "dropdowns", name: "Dropdown" },
-      { key: "companiesData", name: "Master-Company" }
+      { key: "companiesData", name: "Master-Company" },
+      { key: "cancelOrders", name: "Cancel-Order" }
     ];
     
     const sheetNames = activeSheets.map(s => s.name).join(",");
@@ -93,6 +94,7 @@ export const gasApi = {
   // Write operations
   insertRow: (sheetName, rowData) => post({ action: 'insert', sheetName, rowData }),
   batchInsert: (sheetName, rowsData) => post({ action: 'batchInsert', sheetName, rowsData }),
+  cancelOrders: (rowsData) => post({ action: 'batchInsert', sheetName: 'Cancel-Order', rowsData }),
   batchInsertIndent: (sheetName, rowsData) => post({ action: 'batchInsertIndent', sheetName, rowsData }),
   batchInsertLogistics: (sheetName, rowsData) => post({ action: 'batchInsertLogistics', sheetName, rowsData }),
   insertInColumns: (sheetName, startCol, dataRow, headerRow) =>

@@ -322,6 +322,27 @@ export default function DashboardPage() {
                 }
               },
               {
+                key: 'totalCanceledQty',
+                label: 'CANCELLED',
+                render: (v, r) => {
+                  let val = v ?? r.totalCanceledQty ?? r.cancelQty;
+                  if ((val === undefined || val === null) && records && r.indentNumber) {
+                    const matched = records.find(m => String(m.indentNumber).toLowerCase() === String(r.indentNumber).toLowerCase());
+                    if (matched) val = matched.totalCanceledQty ?? matched.cancelQty;
+                  }
+                  const num = val || 0;
+                  return (
+                    <Chip
+                      label={`${num} ${r.unit || 'Nos'}`}
+                      size="small"
+                      color={num > 0 ? "error" : "default"}
+                      variant={num > 0 ? "filled" : "outlined"}
+                      sx={{ fontWeight: 700, height: 20, fontSize: '0.65rem' }}
+                    />
+                  );
+                }
+              },
+              {
                 key: 'poAmount',
                 label: 'PO Amount',
                 render: (_, r) => {

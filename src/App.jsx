@@ -17,6 +17,7 @@ import ArrangeLogisticsPage from './pages/logistics/ArrangeLogisticsPage';
 import ReceiveMaterialPage from './pages/receiveMaterial/ReceiveMaterialPage';
 import LiftReceiverPage from './pages/liftReceiver/LiftReceiverPage';
 import TallyEntryPage from './pages/tallyEntry/TallyEntryPage';
+import OrderCancelPage from './pages/orderCancel/OrderCancelPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import CompanyMasterPage from './pages/master/CompanyMasterPage';
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/receive-material" element={<ProtectedRoute page="receiveMaterial"><ReceiveMaterialPage /></ProtectedRoute>} />
           <Route path="/lift-receiver" element={<ProtectedRoute page="liftReceiver"><LiftReceiverPage /></ProtectedRoute>} />
           <Route path="/tally-entry" element={<ProtectedRoute page="tallyEntry"><TallyEntryPage /></ProtectedRoute>} />
+          <Route path="/order-cancel" element={<ProtectedRoute page="orderCancel"><OrderCancelPage /></ProtectedRoute>} />
           <Route path="/settings"         element={<ProtectedRoute page="settings"><SettingsPage /></ProtectedRoute>} />
           <Route path="/reports"          element={<ProtectedRoute page="reports"><ReportsPage /></ProtectedRoute>} />
           <Route path="/master"           element={<ProtectedRoute page="master"><CompanyMasterPage /></ProtectedRoute>} />

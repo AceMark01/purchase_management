@@ -95,6 +95,11 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
 
   const onSubmit = async (data) => {
     if (!record) return;
+    const qtyVal = Number(data.liftingQty);
+    if (isNaN(qtyVal) || qtyVal < 1 || qtyVal > availablePending) {
+      toast.error(`Lifting Qty must be between 1 and ${availablePending}`);
+      return;
+    }
     const ids = groupIds?.length ? groupIds : [record.id];
     const matchedRecords = allRecords.filter(r => ids.includes(r.id));
 
@@ -231,10 +236,21 @@ export default function ArrangeLogisticsForm({ open, onClose, record, groupIds }
                 </Typography>
                 <TextField fullWidth size="small" type="number"
                   placeholder={`Max ${availablePending}`}
+                  inputProps={{ min: 1, max: availablePending }}
                   {...register('liftingQty', {
                     required: 'Required',
                     min: { value: 1, message: 'Min 1' },
-                    max: { value: availablePending, message: `Max ${availablePending}` }
+                    max: { value: availablePending, message: `Max ${availablePending}` },
+                    onChange: (e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) {
+                        if (val > availablePending) {
+                          setValue('liftingQty', availablePending);
+                        } else if (val < 1 && e.target.value !== '') {
+                          setValue('liftingQty', 1);
+                        }
+                      }
+                    }
                   })}
                   error={!!errors.liftingQty} helperText={errors.liftingQty ? errors.liftingQty.message : `Max pending: ${availablePending}`} />
               </Grid>

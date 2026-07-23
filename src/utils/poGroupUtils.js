@@ -53,6 +53,19 @@ export const PO_COLUMNS = [
     render: (_v, r) => `${r._itemCount || 1} item(s)`,
   },
   {
+    key: '_pendingLifting',
+    label: 'Quantity',
+    minWidth: 110,
+    render: (_v, r) => {
+      let qty = r._pendingLifting;
+      if (qty === undefined || qty === null) qty = r.pendingLifting;
+      if (qty === undefined || qty === null) {
+        qty = Math.max(0, (r._totalQty || r.poQty || r.quantity || 0) - (r._totalLifted || r.totalLifted || 0));
+      }
+      return `${qty} ${r.unit || ''}`.trim();
+    },
+  },
+  {
     key: '_totalAmount',
     label: 'Total Amount',
     minWidth: 140,

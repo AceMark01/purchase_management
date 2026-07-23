@@ -215,6 +215,8 @@ export function DataProvider({ children }) {
   const [headersState, setHeadersState] = useState({});
   const [poHistoryRecords, setPoHistoryRecords] = useState([]);
   const [pendingPoRecords, setPendingPoRecords] = useState([]);
+  const [rawCancelOrders, setRawCancelOrders] = useState([]);
+  const [cancelOrdersState, setCancelOrdersState] = useState([]);
   const [orderByListState, setOrderByListState] = useState([]);
 
   const loadData = async (showGlobalLoading = true, sheetsToFetch = null) => {
@@ -235,7 +237,8 @@ export function DataProvider({ children }) {
           { key: "vendorsData", name: "CReditor MAster" },
           { key: "productsData", name: "Product Master" },
           { key: "dropdowns", name: "Dropdown" },
-          { key: "companiesData", name: "Master-Company" }
+          { key: "companiesData", name: "Master-Company" },
+          { key: "cancelOrders", name: "Cancel-Order" }
         ];
 
         const targets = activeSheets.filter(s => sheetsToFetch.includes(s.key));
@@ -282,6 +285,7 @@ export function DataProvider({ children }) {
       const poSentStatusRaw = fetchedData.poSentStatus !== undefined ? fetchedData.poSentStatus : rawPoSentStatus;
       const poGenerateRaw = fetchedData.poGenerate !== undefined ? fetchedData.poGenerate : rawPoGenerate;
       const poHistoryRaw = fetchedData.poHistory !== undefined ? fetchedData.poHistory : rawPoHistory;
+      const cancelOrdersRaw = fetchedData.cancelOrders !== undefined ? fetchedData.cancelOrders : rawCancelOrders;
 
       console.log("[DEBUG DataContext] Raw rows fetched:", {
         indents: indentsRaw.length,
@@ -291,6 +295,7 @@ export function DataProvider({ children }) {
         receiving: receivingRaw.length,
         users: usersRaw.length,
         poHistory: poHistoryRaw.length,
+        cancelOrders: cancelOrdersRaw.length,
       });
 
       // Update cached state variables
@@ -308,6 +313,7 @@ export function DataProvider({ children }) {
       if (fetchedData.poSentStatus !== undefined || !sheetsToFetch) setRawPoSentStatus(poSentStatusRaw);
       if (fetchedData.poGenerate !== undefined || !sheetsToFetch) setRawPoGenerate(poGenerateRaw);
       if (fetchedData.poHistory !== undefined || !sheetsToFetch) setRawPoHistory(poHistoryRaw);
+      if (fetchedData.cancelOrders !== undefined || !sheetsToFetch) setRawCancelOrders(cancelOrdersRaw);
 
       const headersMap = {
         indents: getHeaderRow(indentsRaw, "INDENT-PO"),
@@ -317,6 +323,7 @@ export function DataProvider({ children }) {
         receiving: getHeaderRow(receivingRaw),
         users: getHeaderRow(usersRaw),
         whatsapp: getHeaderRow(whatsappRaw),
+        cancelOrders: getHeaderRow(cancelOrdersRaw),
         poSentStatus: getHeaderRow(poSentStatusRaw),
         poGenerate: getHeaderRow(poGenerateRaw),
         poHistory: getHeaderRow(poHistoryRaw)
@@ -553,12 +560,15 @@ export function DataProvider({ children }) {
 
         let totalLifted = 0;
         let pendingLifting = 0;
+        let totalCanceledQty = 0;
         if (row._rawRow) {
-          totalLifted = parseNum(row._rawRow[51]);
-          pendingLifting = parseNum(row._rawRow[52]);
+          totalLifted = parseNum(row._rawRow[24]);
+          pendingLifting = parseNum(row._rawRow[26]);
+          totalCanceledQty = parseNum(row._rawRow[25]);
         }
-        if (!totalLifted && row["Total Lifted"]) totalLifted = parseNum(row["Total Lifted"]);
-        if (!pendingLifting && row["Pending Lifting"]) pendingLifting = parseNum(row["Pending Lifting"]);
+        if (!totalLifted && (row["Total Receiving"] || row["Total Lifted"])) totalLifted = parseNum(row["Total Receiving"] || row["Total Lifted"]);
+        if (!pendingLifting && (row["Pending Qty"] || row["Pending Lifting"])) pendingLifting = parseNum(row["Pending Qty"] || row["Pending Lifting"]);
+        if (!totalCanceledQty && (row["Cancel Qty"] || row["Cancel Quntity"])) totalCanceledQty = parseNum(row["Cancel Qty"] || row["Cancel Quntity"]);
 
         return {
           id: row._row || (idx + 1),
@@ -575,6 +585,7 @@ export function DataProvider({ children }) {
           quantity: qty,
           totalLifted: totalLifted,
           pendingLifting: pendingLifting || qty,
+          totalCanceledQty: totalCanceledQty,
           unit: row["Unit"] || "",
           rate: rate,
           gst: gst,
@@ -599,6 +610,17 @@ export function DataProvider({ children }) {
       
       setPendingPoRecords(pendingPo);
       setPoHistoryRecords(mappedPoHistory);
+
+      // Map Cancel-Order entries (sheet header row = 1)
+      const mappedCancelOrders = (cancelOrdersRaw || []).slice(1).map((row, idx) => ({
+        id: idx + 1,
+        timestamp: row[0] || '',
+        indentNumber: row[1] || '',
+        serialNo: row[2] || '',
+        cancelStage: row[3] || '',
+        cancelQty: parseNum(row[4])
+      }));
+      setCancelOrdersState(mappedCancelOrders);
 
       // Map WhatsApp entries
       const mappedWhatsApp = whatsapp.map((row, idx) => mapWhatsAppRow(row, idx));
@@ -809,6 +831,7 @@ export function DataProvider({ children }) {
         addRow,
         poHistoryRecords,
         pendingPoRecords,
+        cancelOrders: cancelOrdersState,
         productTypes: productTypesState,
         units: unitsState,
         orderByList: orderByListState,
@@ -860,6 +883,7 @@ export function DataProvider({ children }) {
           <PremiumLoader size={18} />
           <Typography
             variant="body2"
+            component="div"
             fontWeight={600}
             sx={{
               color: 'text.primary',
@@ -872,11 +896,13 @@ export function DataProvider({ children }) {
           >
             Syncing Live Data
             <Box
+              component="span"
               sx={{
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
                 bgcolor: 'success.main',
+                display: 'inline-block',
                 animation: 'pulse 1.2s infinite ease-in-out',
                 '@keyframes pulse': {
                   '0%': { transform: 'scale(0.8)', opacity: 0.5, boxShadow: '0 0 0 0 rgba(46, 125, 50, 0.7)' },

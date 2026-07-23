@@ -13,6 +13,7 @@ import ForkliftIcon         from '@mui/icons-material/Forklift';
 import InventoryIcon        from '@mui/icons-material/Inventory';
 import MoveToInboxIcon      from '@mui/icons-material/MoveToInbox';
 import CalculateIcon        from '@mui/icons-material/Calculate';
+import CancelIcon           from '@mui/icons-material/Cancel';
 import SettingsIcon         from '@mui/icons-material/Settings';
 import AssessmentIcon       from '@mui/icons-material/Assessment';
 import ExpandLessIcon       from '@mui/icons-material/ExpandLess';
@@ -52,6 +53,7 @@ const NAV_SECTIONS = [
       { label: 'Receive Material',               icon: InventoryIcon,     path: '/receive-material', page: 'receiveMaterial' },
       { label: 'Lift Receiver Material',         icon: MoveToInboxIcon,   path: '/lift-receiver',    page: 'liftReceiver' },
       { label: 'Tally Entry',                    icon: CalculateIcon,     path: '/tally-entry',      page: 'tallyEntry' },
+      { label: 'Order Cancel',                   icon: CancelIcon,        path: '/order-cancel',     page: 'orderCancel' },
     ],
   },
   {

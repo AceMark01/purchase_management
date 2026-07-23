@@ -16,6 +16,28 @@ import { generatePoPdfBlob } from './pdf-generate';
 
 const generatePONumber = () => `ACE/PO/25-26-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
+const formatToIsoDate = (val) => {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  const str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10);
+    }
+  } catch (e) {}
+  return new Date().toISOString().slice(0, 10);
+};
+
 // Transparent input used inside the printable PO template
 const TransparentInput = ({ readOnly, inputProps = {}, ...props }) => (
   <TextField
@@ -96,7 +118,7 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       delivery: 'Within 2-3 Weeks from PO date',
       transport: 'By Vendor',
       paymentTerms: '30 Days credit',
-      dispatchDate: '',
+      dispatchDate: new Date().toISOString().slice(0, 10),
     }
   });
 
@@ -184,7 +206,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
       const poGroup = poHistoryRecords.filter(r => r.poNumber && r.poNumber.toLowerCase() === viewRecord.poNumber.toLowerCase());
 
       setValue('poNumber', viewRecord.poNumber || '');
-      setValue('poDate', viewRecord.timestamp ? new Date(viewRecord.timestamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+      setValue('poDate', formatToIsoDate(viewRecord.poDate || viewRecord.timestamp || (poGroup[0] && (poGroup[0].poDate || poGroup[0].timestamp))));
+      const rawDispatchDate = viewRecord.dispatchDate || viewRecord.expectedArrivalDate || (poGroup[0] && (poGroup[0].dispatchDate || poGroup[0].expectedArrivalDate)) || viewRecord.timestamp || viewRecord.poDate;
+      setValue('dispatchDate', formatToIsoDate(rawDispatchDate));
       setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
 
@@ -219,7 +243,9 @@ export default function GeneratePOForm({ open, onClose, viewRecord, selectedRowI
     } else {
       // Fallback for older records without poDetails
       setValue('poNumber', viewRecord.poNumber || '');
-      setValue('poDate', viewRecord.poDate || new Date().toISOString().slice(0, 10));
+      setValue('poDate', formatToIsoDate(viewRecord.poDate || viewRecord.timestamp));
+      const rawDispatchDate = viewRecord.dispatchDate || viewRecord.expectedArrivalDate || viewRecord.poDate || viewRecord.timestamp;
+      setValue('dispatchDate', formatToIsoDate(rawDispatchDate));
       setValue('vendorName', viewRecord.partyName || '');
       setValue('companyName', viewRecord.companyName || '');
 

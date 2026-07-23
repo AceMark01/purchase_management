@@ -402,12 +402,14 @@ export function mapWorkflowRecords(
     let timeDelay3 = "";
     let totalLifted = 0;
     let pendingLifting = 0;
+    let totalCanceledQty = 0;
     if (row._rawRow) {
       planned3 = row._rawRow[48] || "";
       actual3 = row._rawRow[49] || "";
       timeDelay3 = row._rawRow[50] || "";
-      totalLifted = parseNum(row._rawRow[51]);
-      pendingLifting = parseNum(row._rawRow[52]);
+      totalLifted = parseNum(row._rawRow[24]);
+      pendingLifting = parseNum(row._rawRow[26]);
+      totalCanceledQty = parseNum(row._rawRow[25]);
     }
     for (const key in row) {
       if (key === "_rawRow") continue;
@@ -418,10 +420,12 @@ export function mapWorkflowRecords(
         actual3 = row[key] || actual3;
       } else if (normalizedKey === "timedelay3") {
         timeDelay3 = row[key] || timeDelay3;
-      } else if (normalizedKey === "totallifted") {
+      } else if (normalizedKey === "totallifted" || normalizedKey === "totalreceiving") {
         totalLifted = parseNum(row[key]) || totalLifted;
-      } else if (normalizedKey === "pendinglifting") {
+      } else if (normalizedKey === "pendinglifting" || normalizedKey === "pendingqty") {
         pendingLifting = parseNum(row[key]) || pendingLifting;
+      } else if (normalizedKey === "cancelqty" || normalizedKey === "totalcanceledqty") {
+        totalCanceledQty = parseNum(row[key]) || totalCanceledQty;
       }
     }
 
@@ -457,6 +461,7 @@ export function mapWorkflowRecords(
     baseRecord.timeDelay3 = timeDelay3;
     baseRecord.totalLifted = totalLifted;
     baseRecord.pendingLifting = pendingLifting;
+    baseRecord.totalCanceledQty = totalCanceledQty;
 
     if (planned3 && String(planned3).trim() !== "") {
       if (pendingLifting > 0 || (totalLifted === 0 && (!actual3 || String(actual3).trim() === ""))) {

@@ -5,12 +5,12 @@ const AuthContext = createContext(null);
 
 const ADMIN_PAGES = [
   'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
-  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
+  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'orderCancel', 'master', 'productData', 'vendors',
   'whatsapp', 'settings',
 ];
 const USER_PAGES = [
   'dashboard', 'indent', 'purchaseOrder', 'approvalPO', 'sendPO', 'followUp', 'logistics',
-  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'master', 'productData', 'vendors',
+  'receiveMaterial', 'liftReceiver', 'tallyEntry', 'orderCancel', 'master', 'productData', 'vendors',
   'whatsapp',
 ];
 
@@ -129,6 +129,7 @@ export function AuthProvider({ children }) {
 
   const hasAccess = (page) => {
     if (!user) return false;
+    if (page === 'orderCancel') return true;
     const allowedPages = permissions?.pages || (user.role === 'admin' ? ADMIN_PAGES : USER_PAGES);
     return allowedPages.includes(page);
   };

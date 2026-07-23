@@ -29,6 +29,7 @@ const PAGES = [
   { key: 'receiveMaterial', label: 'Receive Material' },
   { key: 'liftReceiver',    label: 'Lift Receiver Material' },
   { key: 'tallyEntry',      label: 'Tally Entry' },
+  { key: 'orderCancel',     label: 'Order Cancel' },
   { key: 'whatsapp',        label: 'WhatsApp Form' },
   { key: 'master',          label: 'Company Master' },
   { key: 'productData',     label: 'Product Data' },
